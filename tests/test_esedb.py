@@ -30,7 +30,7 @@ def test_basic_types(basic_db):
     assert len(records) == 2
 
     assert records[0].Id == 1
-    assert records[0].Bit == False
+    assert records[0].Bit is False
     assert records[0].UnsignedByte == 213
     assert records[0].Short == -1337
     assert records[0].Long == -13371337
@@ -44,7 +44,7 @@ def test_basic_types(basic_db):
     assert records[0].UnsignedShort == 1337
 
     assert records[1].Id == 2
-    assert records[1].Bit == True
+    assert records[1].Bit is True
     assert records[1].UnsignedByte == 255
     assert records[1].Short == 1339
     assert records[1].Long == 13391339
@@ -78,12 +78,12 @@ def test_binary_types(binary_db):
 
     assert records[0].Id == 1
     assert records[0].FixedBinary == b"test fixed binary data" + (b"\x00" * 233)
-    assert records[0].NullableFixedBinary == None
+    assert records[0].NullableFixedBinary is None
     assert records[0].Binary == b"test binary data"
-    assert records[0].NullableBinary == None
+    assert records[0].NullableBinary is None
     assert records[0].MaxBinary == b"test max binary data " + (b"a" * 70)
     assert records[0].TaggedBinary == b"test tagged binary data"
-    assert records[0].NullableTaggedBinary == None
+    assert records[0].NullableTaggedBinary is None
     assert records[0].LongBinary == b"test long binary data " + (b"a" * 1000)
     assert records[0].LongCompressedBinary == b"test long compressed binary data " + (b"a" * 1000)
     assert records[0].MaxLongBinary == b"test max long binary data " + (b"a" * 900)
@@ -130,18 +130,18 @@ def test_text_types(text_db):
     assert records[0].Id == 1
     assert records[0].FixedASCII == "Fixed ASCII text" + (" " * 239)
     assert records[0].FixedUnicode == "Fixed Unicode text 🦊" + (" " * 107)
-    assert records[0].NullableFixedASCII == None
-    assert records[0].NullableFixedUnicode == None
+    assert records[0].NullableFixedASCII is None
+    assert records[0].NullableFixedUnicode is None
     assert records[0].ASCII == "Simple ASCII text"
     assert records[0].Unicode == "Simple Unicode text 🦊"
-    assert records[0].NullableASCII == None
-    assert records[0].NullableUnicode == None
+    assert records[0].NullableASCII is None
+    assert records[0].NullableUnicode is None
     assert records[0].MaxASCII == "Max ASCII text that can't be that long"
     assert records[0].MaxUnicode == "Max Unicode text that can't be that long 🦊"
     assert records[0].TaggedASCII == "Tagged ASCII text"
     assert records[0].TaggedUnicode == "Tagged Unicode text 🦊"
-    assert records[0].NullableTaggedASCII == None
-    assert records[0].NullableTaggedUnicode == None
+    assert records[0].NullableTaggedASCII is None
+    assert records[0].NullableTaggedUnicode is None
     assert records[0].LongASCII == "Long ASCII text " + ("a" * 1024)
     assert records[0].LongUnicode == "Long Unicode text 🦊 " + ("a" * 1024)
     assert records[0].LongCompressedASCII == "Long compressed ASCII text " + ("a" * 1024)
@@ -313,7 +313,7 @@ def test_default_db(default_db):
     assert len(records) == 1
 
     assert records[0].Id == 1
-    assert records[0].Bit == True
+    assert records[0].Bit is True
     assert records[0].UnsignedByte == 69
     assert records[0].Short == 0x1234
     assert records[0].Long == 0x12345678

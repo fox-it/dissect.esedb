@@ -425,7 +425,7 @@ flag JET_bitIndex : uint32 {
     DotNetGuid              = 0x00040000,           // index over GUID column according to .Net GUID sort order
     ImmutableStructure      = 0x00080000,           // Do not write to the input structures during a JetCreateIndexN call.
 };
-"""
+"""  # noqa E501
 
 c_esedb = cstruct.cstruct()
 c_esedb.load(c_esedb_def)
