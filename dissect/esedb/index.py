@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from dissect.esedb.c_esedb import CODEPAGE, JET_bitIndex, JET_coltyp, RecordValue
 from dissect.esedb.cursor import Cursor
+from dissect.esedb.lcmapstring import map_string
 from dissect.esedb.page import Node, Page
 from dissect.esedb.record import Record
 
@@ -99,7 +100,7 @@ class Index(object):
             if column.name not in values:
                 break
 
-            key_part = encode_key(column, values[column.name], self._var_seg_mac)
+            key_part = encode_key(self, column, values[column.name], self._var_seg_mac)
             key_buf.append(key_part)
             key_remaining -= len(key_part)
 
@@ -122,7 +123,7 @@ bPrefixData = 0x7F
 bSentinel = 0xFF
 
 
-def encode_key(column: Column, value: RecordValue, max_size: int) -> bytes:
+def encode_key(index: Index, column: Column, value: RecordValue, max_size: int) -> bytes:
     """Encode various values into their normalized index key form.
 
     Args:
@@ -240,7 +241,10 @@ def encode_key(column: Column, value: RecordValue, max_size: int) -> bytes:
             key += value.upper().encode()
             key.append(0)
         else:
-            raise NotImplementedError(f"Can't encode value to key: {value} ({column})")
+            flags = index.record.get("LCMapFlags")
+            locale = index.record.get("LocaleName").decode("utf-16-le")
+            segment = map_string(value, flags, locale)
+            key += segment[:max_size]
 
     elif column.type == JET_coltyp.UnsignedLong:
         # Unsigned variants are added as is

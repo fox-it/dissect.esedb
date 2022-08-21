@@ -73,7 +73,7 @@ def test_index(index_db):
 
     assert table.indexes[16].name == "IxUnicode"
     assert table.indexes[16].column_ids == [130]
-    # assert table.indexes[16].search(Unicode="Simple Unicode text 🦊")
+    assert table.indexes[16].search(Unicode="Simple Unicode text 🦊")
 
     assert table.indexes[17].name == "IxLongASCII"
     assert table.indexes[17].column_ids == [257]
@@ -81,4 +81,4 @@ def test_index(index_db):
 
     assert table.indexes[18].name == "IxLongUnicode"
     assert table.indexes[18].column_ids == [258]
-    # assert table.indexes[18].search(LongUnicode="Long Unicode text 🦊 " + ("a" * 1024))
+    assert table.indexes[18].search(LongUnicode="Long Unicode text 🦊 " + ("a" * 1024))
