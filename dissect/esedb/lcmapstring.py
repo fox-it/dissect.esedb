@@ -1,3 +1,6 @@
+# Based on Wine source
+# https://github.com/wine-mirror/wine/blob/master/dlls/kernelbase/locale.c
+
 from enum import IntEnum, IntFlag
 
 from dissect.util.xmemoryview import xmemoryview
