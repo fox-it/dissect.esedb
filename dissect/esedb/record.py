@@ -150,7 +150,7 @@ class RecordData:
 
         Optionally receive the raw data as it's stored in the record.
 
-        If the database is opened in impacket compatibility mode, skip most of the parsing and return the values
+        If the database has been opened in impacket compatibility mode, skip most of the parsing and return the values
         that impacket expects.
 
         Args:
@@ -245,8 +245,6 @@ class RecordData:
 
     def _get_fixed(self, column: Column) -> Optional[bytes]:
         """Parse a specific fixed column."""
-        value = None
-
         if column.identifier <= self._last_fixed_id:
             # Check if it's not null
             bit_idx_identifier = column.identifier - 1
@@ -266,8 +264,6 @@ class RecordData:
 
     def _get_variable(self, column: Column) -> Optional[bytes]:
         """Parse a specific variable column."""
-        value = None
-
         if column.identifier <= self._last_variable_id:
             identifier_idx = column.identifier - 128
             if identifier_idx == 0:
@@ -280,7 +276,7 @@ class RecordData:
             # The value at the own index is the end offset of this value
             value_end = self._variable_offsets[identifier_idx]
 
-            # If the MSB is set, it means the entry is empty
+            # If the MSB has been set, it means the entry is empty
             if value_end & 0x8000 == 0:
                 # Offset everything with the variable data value starting offset
                 value_offset = self._variable_data_start
@@ -296,7 +292,7 @@ class RecordData:
 
     def _get_tagged(self, column: Column) -> Optional[bytes]:
         """Parse a specific tagged column."""
-        tag_field = value = None
+        tag_field = None
 
         idx = self._find_tag_field_idx(column.identifier)
         if idx is not None:

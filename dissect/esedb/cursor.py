@@ -37,7 +37,7 @@ class Cursor:
     def next(self) -> Node:
         """Move the cursor to the next node and return it.
 
-        Can move the cursor to the enxt page as a side effect.
+        Can move the cursor to the next page as a side effect.
         """
         if self._node_num + 1 > self._page.node_count - 1:
             self.next_page()

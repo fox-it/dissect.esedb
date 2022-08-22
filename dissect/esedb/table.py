@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class Table:
     """Represents a table in an ESE database.
 
-    Contains all the relevant metadata of the table, as well as all columns and indices that were added
+    Contains all the relevant metadata of the table, as well as all columns and indices that have been added
     by the catalog.
 
     Args:

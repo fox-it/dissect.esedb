@@ -98,8 +98,6 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
     key_primary = []
     key_diacritic = []
     key_case = []
-    # key_extra = [[], [], [], []]
-    # key_special = []
 
     if not flags & MapFlags.LCMAP_SORTKEY:
         raise NotImplementedError("Only LCMAP_SORTKEY is partially supported")
@@ -115,53 +113,56 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
     view = xmemoryview(value.encode("utf-16-le"), "<H")
     for cp in view:
         weight = table[cp]
-        aw, sm, dw, cw = weight >> 24, (weight >> 16) & 0xFF, (weight >> 8) & 0xFF, weight & 0xFF
-        cw &= case_mask
 
-        if sm == SCRIPT.UNSORTABLE:
+        alphabetic_weight = weight >> 24
+        script_member = (weight >> 16) & 0xFF
+        diacritic_weight = (weight >> 8) & 0xFF
+        case_weight = (weight & 0xFF) & case_mask
+
+        if script_member == SCRIPT.UNSORTABLE:
             continue
 
-        if sm == SCRIPT.NONSPACE_MARK:
+        if script_member == SCRIPT.NONSPACE_MARK:
             if flags & MapFlags.LINGUISTIC_IGNOREDIACRITIC:
-                dw = 2
+                diacritic_weight = 2
 
             if len(key_diacritic):
-                key_diacritic[-1] += dw
+                key_diacritic[-1] += diacritic_weight
             else:
-                key_diacritic.append(dw)
+                key_diacritic.append(diacritic_weight)
 
-        if sm == SCRIPT.EXPANSION:
+        if script_member == SCRIPT.EXPANSION:
             raise NotImplementedError(SCRIPT.EXPANSION)
 
-        if sm == SCRIPT.EASTASIA_SPECIAL:
+        if script_member == SCRIPT.EASTASIA_SPECIAL:
             raise NotImplementedError(SCRIPT.EASTASIA_SPECIAL)
 
-        if sm == SCRIPT.JAMO_SPECIAL:
+        if script_member == SCRIPT.JAMO_SPECIAL:
             raise NotImplementedError(SCRIPT.JAMO_SPECIAL)
 
-        if sm == SCRIPT.EXTENSION_A:
+        if script_member == SCRIPT.EXTENSION_A:
             key_primary.append(0xFD)
             key_primary.append(0xFF)
-            key_primary.append(aw)
-            key_primary.append(dw)
+            key_primary.append(alphabetic_weight)
+            key_primary.append(diacritic_weight)
             key_diacritic.append(2)
             key_case.append(2)
             continue
 
-        if sm == SCRIPT.PUNCTUATION:
+        if script_member == SCRIPT.PUNCTUATION:
             if flags & MapFlags.NORM_IGNORESYMBOLS:
                 continue
 
             if not flags & MapFlags.SORT_STRINGSORT:
                 raise NotImplementedError(SCRIPT.PUNCTUATION)
 
-            key_primary.append(sm)
-            key_primary.append(aw)
-            key_diacritic.append(dw)
-            key_case.append(cw)
+            key_primary.append(script_member)
+            key_primary.append(alphabetic_weight)
+            key_diacritic.append(diacritic_weight)
+            key_case.append(case_weight)
             continue
 
-        if sm in (
+        if script_member in (
             SCRIPT.SYMBOL_1,
             SCRIPT.SYMBOL_2,
             SCRIPT.SYMBOL_3,
@@ -171,19 +172,20 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
         ):
             if flags & MapFlags.NORM_IGNORESYMBOLS:
                 continue
-            key_primary.append(sm)
-            key_primary.append(aw)
-            key_diacritic.append(dw)
-            key_case.append(cw)
+            key_primary.append(script_member)
+            key_primary.append(alphabetic_weight)
+            key_diacritic.append(diacritic_weight)
+            key_case.append(case_weight)
             continue
 
-        if sm == SCRIPT.DIGIT and 0:
+        if script_member == SCRIPT.DIGIT and 0:
             raise NotImplementedError(SCRIPT.DIGIT)
-        else:
-            key_primary.append(sm)
-            key_primary.append(aw)
-            key_diacritic.append(dw)
-            key_case.append(cw)
+
+        # else
+        key_primary.append(script_member)
+        key_primary.append(alphabetic_weight)
+        key_diacritic.append(diacritic_weight)
+        key_case.append(case_weight)
 
     key_diacritic = _filter_weights(key_diacritic)
     if flags & (MapFlags.NORM_IGNORECASE | MapFlags.NORM_IGNOREWIDTH):
