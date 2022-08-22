@@ -94,6 +94,9 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
 
     Returns:
         A sorting key of the given input that should be compatible with LCMapStringEx.
+
+    Raises:
+        NotImplementedError: If an unsupported flag or character is encountered.
     """
     key_primary = []
     key_diacritic = []

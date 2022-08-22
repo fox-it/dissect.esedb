@@ -77,7 +77,11 @@ class Table:
 
     @cached_property
     def lv_page(self) -> Page:
-        """Return the long value page of the table."""
+        """Return the long value page of the table.
+
+        Raises:
+            TypeError: If the table has no long values.
+        """
         if not self._long_value_record:
             raise TypeError(f"Table has no long values: {self.name}")
 

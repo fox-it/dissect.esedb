@@ -76,6 +76,9 @@ class RecordData:
     Args:
         table: The table this record is from.
         data: The node data of this record.
+
+    Raises:
+        NotImplementedError: If old format tagged fields are encountered.
     """
 
     def __init__(self, table: Table, node: Node):

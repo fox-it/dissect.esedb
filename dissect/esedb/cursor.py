@@ -47,7 +47,11 @@ class Cursor:
         return self.node()
 
     def next_page(self) -> None:
-        """Move the cursor to the next page in the tree."""
+        """Move the cursor to the next page in the tree.
+
+        Raises:
+            NoNeighbourPageError: If the current page has no next page.
+        """
         if self._page.next_page:
             self._page = self.esedb.page(self._page.next_page)
             self._node_num = 0
@@ -67,7 +71,11 @@ class Cursor:
         return self.node()
 
     def prev_page(self) -> None:
-        """Move the cursor to the previous page in the tree."""
+        """Move the cursor to the previous page in the tree.
+
+        Raises:
+            NoNeighbourPageError: If the current page has no previous page.
+        """
         if self._page.previous_page:
             self._page = self.esedb.page(self._page.previous_page)
             self._node_num = self._page.node_count - 1

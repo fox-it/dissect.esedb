@@ -11,6 +11,9 @@ def decompress(buf: bytes) -> bytes:
 
     Args:
         buf: The compressed bytes to decompress.
+
+    Raises:
+        NotImplementedError: If the buffer is compressed with an unsupported compression algorithm (XPRESS9/XPRESS10).
     """
     identifier = buf[0] >> 3
     if identifier == COMPRESSION_SCHEME.COMPRESS_7BITASCII:
@@ -31,6 +34,9 @@ def decompress_size(buf: bytes) -> Optional[int]:
 
     Args:
         buf: The compressed bytes to return the decompressed size of.
+
+    Raises:
+        NotImplementedError: If the buffer is compressed with an unsupported compression algorithm (XPRESS9/XPRESS10).
     """
     identifier = buf[0] >> 3
     if identifier == COMPRESSION_SCHEME.COMPRESS_7BITASCII:

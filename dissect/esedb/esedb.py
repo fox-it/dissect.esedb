@@ -22,6 +22,9 @@ class EseDB:
     Args:
         fh: The file-like object to open an ESE database on.
         impacket_compat: Whether to make the output impacket compatible.
+
+    Raises:
+        InvalidDatabase: If the file-like object does not look like an ESE database.
     """
 
     def __init__(self, fh: BinaryIO, impacket_compat: bool = False):
@@ -64,6 +67,9 @@ class EseDB:
 
         Args:
             num: The physical page number to retrieve.
+
+        Raises:
+            IndexError: If the page number is out of bounds.
         """
         if num < 1:
             raise IndexError("page number cannot be less than 1")
