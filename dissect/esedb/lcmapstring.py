@@ -196,20 +196,20 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
     else:
         key_case = _filter_weights(key_case)
 
-    key = bytearray()
-    key.extend(key_primary)
-    key.append(0x01)
-    if not flags & MapFlags.NORM_IGNORENONSPACE:
-        key.extend(key_diacritic)
-    key.append(0x01)
-    key.extend(key_case)
-    key.append(0x01)
-    # extra would go here
-    key.append(0x01)
-    # special would go here
-    key.append(0x00)
-
-    return bytes(key)
+    return bytes(
+        [
+            *key_primary,
+            0x01,
+            *(key_diacritic if not flags & MapFlags.NORM_IGNORENONSPACE else []),
+            0x01,
+            *key_case,
+            0x01,
+            # extra would go here
+            0x01,
+            # special would go here
+            0x00,
+        ]
+    )
 
 
 def _filter_weights(weights):

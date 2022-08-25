@@ -3,7 +3,7 @@ from __future__ import annotations
 import struct
 import uuid
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from dissect.esedb.c_esedb import CODEPAGE, JET_bitIndex, JET_coltyp, RecordValue
 from dissect.esedb.cursor import Cursor
@@ -58,7 +58,7 @@ class Index(object):
     @cached_property
     def columns(self) -> list[Column]:
         """Return a list of all columns that are used in this index."""
-        return list(map(lambda idx: self.table._column_id_map[idx], self.column_ids))
+        return [self.table._column_id_map[cid] for cid in self.column_ids]
 
     def search(self, **kwargs) -> Record:
         """Search the index for the requested values.
@@ -157,110 +157,127 @@ def encode_key(index: Index, column: Column, value: RecordValue, max_size: int) 
     elif column.type == JET_coltyp.IEEESingle:
         value = struct.unpack("<I", struct.pack("<f", value))[0]
 
-        if value & (1 << 31):
-            # If the high bit is set, all bits are flipped
-            value = ~value & ((1 << 32) - 1)
-        else:
-            # Otherwise only the high bit is flipped
-            value ^= 1 << 31
-
+        value = _flip_bits(value, 32)
         key += struct.pack(">I", value)
 
     elif column.type in (JET_coltyp.IEEEDouble, JET_coltyp.DateTime):
         if column.type == JET_coltyp.IEEEDouble:
             value = struct.unpack("<Q", struct.pack("<d", value))[0]
 
-        if value & (1 << 63):
-            # If the high bit is set, all bits are flipped
-            value = ~value & ((1 << 64) - 1)
-        else:
-            # Otherwise only the high bit is flipped
-            value ^= 1 << 63
-
+        value = _flip_bits(value, 64)
         key += struct.pack(">Q", value)
 
     elif column.is_binary:
-        if not len(value):
-            # Empty values (but non null)
-            key = bytearray([bPrefixZeroLength])
-        elif column.is_fixed:
-            # Fixed size binary values are added as is
-            if len(value) + 1 > max_size:
-                value = value[:max_size]
-            key += value
-        else:
-            # Otherwise added as chunks of 8
-            num_chunks = (len(value) + 7) // 8
-            # Each chunk has 1 header byte, and the key has a header byte
-            key_size = (num_chunks * 9) + 1
-
-            normalized_all = True
-            if key_size > max_size:
-                key_size = max_size
-                normalized_all = False
-
-            key_remaining = key_size - 1
-
-            value_offset = 0
-            value_remaining = len(value)
-            while key_remaining >= 9:
-                chunk = value[value_offset : value_offset + 8]
-                key += chunk
-
-                if value_remaining <= 8:
-                    # Last chunk
-                    if value_remaining == 8:
-                        key.append(0x08 if normalized_all else 0x09)  # cbFLDBinaryChunk or cbFLDBinaryChunkNormalized
-                    else:
-                        # Pad to 8 bytes
-                        key.extend([0] * (8 - len(chunk)))
-                        key.append(len(chunk))
-                else:
-                    key.append(0x09)  # cbFLDBinaryChunkNormalized
-                    value_offset += 8
-                    value_remaining -= 8
-
-                key_remaining -= 9
-
-            if key_remaining:
-                if value_remaining >= key_remaining:
-                    key += value[value_offset : value_offset + key_remaining]
-                else:
-                    key += value[value_offset : value_offset + value_remaining]
-                    key.extend([0] * (key_remaining - value_remaining))
+        key += _encode_binary(column, value, max_size)
 
     elif column.is_text:
-        # Unicode strings == LCMapStringW
-        # ASCII strings == uppercase
-        if not len(value):
-            # Empty values (but non null) are indicated with 0x40
-            key = bytearray([bPrefixZeroLength])
-        elif column.encoding in (CODEPAGE.ASCII, CODEPAGE.WESTERN):
-            if len(value) + 1 > max_size:
-                value = value[:max_size]
-            key += value.upper().encode()
-            key.append(0)
-        else:
-            flags = index.record.get("LCMapFlags")
-            locale = index.record.get("LocaleName").decode("utf-16-le")
-            segment = map_string(value, flags, locale)
-            key += segment[:max_size]
+        key += _encode_text(index, column, value, max_size)
 
     elif column.type == JET_coltyp.UnsignedLong:
         # Unsigned variants are added as is
         key += struct.pack(">I", value)
 
     elif column.type == JET_coltyp.GUID:
-        if isinstance(value, str):
-            value = uuid.UUID(value)
-        guid_bytes = value.bytes_le
-        key += guid_bytes[-6:]
-        key += guid_bytes[-8:-6]
-        key += guid_bytes[-10:-8]
-        key += guid_bytes[-12:-10]
-        key += guid_bytes[:-12]
+        key += _encode_guid(value)
 
     elif column.type == JET_coltyp.UnsignedShort:
         key += struct.pack(">H", value)
 
     return bytes(key)
+
+
+def _encode_binary(column: Column, value: bytes, max_size: int) -> bytes:
+    cbFLDBinaryChunk = 0x08
+    cbFLDBinaryChunkNormalized = 0x09
+
+    key = bytearray()
+
+    if not len(value):
+        # Empty values (but non null)
+        key = bytes([bPrefixZeroLength])
+    elif column.is_fixed:
+        # Fixed size binary values are added as is
+        if len(value) + 1 > max_size:
+            value = value[:max_size]
+        key += value
+    else:
+        # Otherwise added as chunks of 8
+        num_chunks = (len(value) + 7) // 8
+        # Each chunk has 1 header byte, and the key has a header byte
+        key_size = (num_chunks * 9) + 1
+
+        normalized_all = True
+        if key_size > max_size:
+            key_size = max_size
+            normalized_all = False
+
+        key_remaining = key_size - 1
+
+        value_offset = 0
+        value_remaining = len(value)
+        while key_remaining >= 9:
+            chunk = value[value_offset : value_offset + 8]
+            key += chunk
+
+            if value_remaining <= 8:
+                # Last chunk
+                if value_remaining == 8:
+                    key.append(cbFLDBinaryChunk if normalized_all else cbFLDBinaryChunkNormalized)
+                else:
+                    # Pad to 8 bytes
+                    key.extend([0] * (8 - len(chunk)))
+                    key.append(len(chunk))
+            else:
+                key.append(cbFLDBinaryChunkNormalized)
+                value_offset += 8
+                value_remaining -= 8
+
+            key_remaining -= 9
+
+        if key_remaining:
+            if value_remaining >= key_remaining:
+                key += value[value_offset : value_offset + key_remaining]
+            else:
+                key += value[value_offset : value_offset + value_remaining]
+                key.extend([0] * (key_remaining - value_remaining))
+
+    return bytes(key)
+
+
+def _encode_text(index: Index, column: Column, value: str, max_size: int) -> bytes:
+    key = bytearray()
+
+    if not len(value):
+        # Empty values (but non null) are indicated with 0x40
+        key = bytes([bPrefixZeroLength])
+    elif column.encoding in (CODEPAGE.ASCII, CODEPAGE.WESTERN):
+        # ASCII strings == uppercase
+        if len(value) + 1 > max_size:
+            value = value[:max_size]
+        key += value.upper().encode()
+        key.append(0)
+    else:
+        # Unicode strings == LCMapStringW
+        flags = index.record.get("LCMapFlags")
+        locale = index.record.get("LocaleName").decode("utf-16-le")
+        segment = map_string(value, flags, locale)
+        key += segment[:max_size]
+
+    return bytes(key)
+
+
+def _encode_guid(value: Union[str, uuid.UUID]) -> bytes:
+    if isinstance(value, str):
+        value = uuid.UUID(value)
+    guid_bytes = value.bytes_le
+
+    return guid_bytes[-6:] + guid_bytes[-8:-6] + guid_bytes[-10:-8] + guid_bytes[-12:-10] + guid_bytes[:-12]
+
+
+def _flip_bits(value: int, size: int) -> int:
+    if value & (1 << (size - 1)):
+        # If the high bit is set, all bits are flipped
+        return ~value & ((1 << size) - 1)
+    else:
+        # Otherwise only the high bit is flipped
+        return value ^ (1 << (size - 1))

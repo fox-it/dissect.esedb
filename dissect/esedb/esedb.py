@@ -77,7 +77,7 @@ class EseDB:
         self.fh.seek((num - 1) * self.page_size)
         buf = self.fh.read(self.page_size)
 
-        if not buf:
+        if len(buf) != self.page_size:
             raise IndexError("page number exceeds file size")
 
         return buf

@@ -6,9 +6,9 @@ class InvalidDatabase(Error):
     pass
 
 
-class KeyNotFoundError(Exception):
+class KeyNotFoundError(Error):
     pass
 
 
-class NoNeighbourPageError(Exception):
+class NoNeighbourPageError(Error):
     pass

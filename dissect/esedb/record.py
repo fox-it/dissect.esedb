@@ -205,32 +205,7 @@ class RecordData:
         else:
             if tag_field:
                 if tag_field.flags & TAGFLD_HEADER.MultiValues:
-                    if tag_field.flags & TAGFLD_HEADER.TwoValues:
-                        # Optimized storage for when a multi-value only has two values
-                        # First byte is the size of the first value, calculate the size of the second value from that
-                        first_size = value[0]
-                        second_size = len(value) - (1 + first_size)
-                        value = [value[1 : 1 + first_size], value[1 + first_size : 1 + first_size + second_size]]
-                    elif tag_field.flags & TAGFLD_HEADER.MultiValues:
-                        # Regular multi-value storage, starts with an array of USHORT offsets to the actual values
-                        # Just calculate the amount of values from the first entry
-                        # Individual offsets can have a fSeparatedInstance (0x8000) flag set
-                        first_value_offset = struct.unpack("<H", value[0:2])[0] & 0x7FFF
-                        num_values = first_value_offset // 2  # sizeof(USHORT)
-                        value_offsets = struct.unpack(f"<{num_values}H", value[:first_value_offset]) + (len(value),)
-
-                        values = []
-                        for i in range(num_values):
-                            offset = value_offsets[i]
-                            data = value[offset & 0x7FFF : value_offsets[i + 1] & 0x7FFF]
-                            if offset & 0x8000:  # fSeparatedInstance
-                                data = self.table.get_long_value(bytes(data))
-                            values.append(data)
-                        value = values
-
-                    if tag_field.flags & TAGFLD_HEADER.Compressed:
-                        # Only the first entry appears to be compressed
-                        value[0] = compression.decompress(value[0])
+                    value = self._parse_multivalue(value, tag_field)
                 else:
                     if tag_field.flags & TAGFLD_HEADER.Separated:
                         value = self.table.get_long_value(bytes(value))
@@ -243,6 +218,38 @@ class RecordData:
                 value = list(map(parse_func, value))
             else:
                 value = parse_func(value)
+
+        return value
+
+    def _parse_multivalue(self, value: bytes, tag_field: TagField):
+        fSeparatedInstance = 0x8000
+
+        if tag_field.flags & TAGFLD_HEADER.TwoValues:
+            # Optimized storage for when a multi-value only has two values
+            # First byte is the size of the first value, calculate the size of the second value from that
+            first_size = value[0]
+            second_size = len(value) - (1 + first_size)
+            value = [value[1 : 1 + first_size], value[1 + first_size : 1 + first_size + second_size]]
+        elif tag_field.flags & TAGFLD_HEADER.MultiValues:
+            # Regular multi-value storage, starts with an array of USHORT offsets to the actual values
+            # Just calculate the amount of values from the first entry
+            # Individual offsets can have a fSeparatedInstance (0x8000) flag set
+            first_value_offset = struct.unpack("<H", value[0:2])[0] & 0x7FFF
+            num_values = first_value_offset // 2  # sizeof(USHORT)
+            value_offsets = struct.unpack(f"<{num_values}H", value[:first_value_offset]) + (len(value),)
+
+            values = []
+            for i in range(num_values):
+                offset = value_offsets[i]
+                data = value[offset & 0x7FFF : value_offsets[i + 1] & 0x7FFF]
+                if offset & fSeparatedInstance:
+                    data = self.table.get_long_value(bytes(data))
+                values.append(data)
+            value = values
+
+        if tag_field.flags & TAGFLD_HEADER.Compressed:
+            # Only the first entry appears to be compressed
+            value[0] = compression.decompress(value[0])
 
         return value
 
@@ -344,10 +351,10 @@ class RecordData:
 
         lookup = identifier
         if is_derived:
-            lookup |= 0x8000 << 16  # fDerived
+            lookup |= TagField.fDerived << 16  # fDerived
 
         # TAGFLD::CmpTagfld2
-        flip_derived = 0x8000 << 16
+        flip_derived = TagField.fDerived << 16
         mask = flip_derived | ((1 << 16) - 1)
         value2 = flip_derived ^ (lookup & mask)
 
@@ -379,6 +386,9 @@ class TagField:
 
     __slots__ = ("record", "identifier", "_offset", "offset", "has_extended_info", "flags")
 
+    fNullSmallPage = 0x2000
+    fDerived = 0x8000
+
     def __init__(self, record: RecordData, value: int):
         self.record = record
         self.identifier = value & 0xFFFF
@@ -403,14 +413,14 @@ class TagField:
     def is_null(self) -> bool:
         """Return whether this tagged field is null."""
         if self.record.esedb.has_small_pages:
-            return bool(self._offset & 0x2000)  # fNullSmallPage
+            return bool(self._offset & TagField.fNullSmallPage)
         else:
             return bool(self.flags & TAGFLD_HEADER.Null)
 
     @property
     def is_derived(self) -> bool:
         """Return whether this tagged field is derived."""
-        return bool(self._offset & 0x8000)  # & fDerived
+        return bool(self._offset & TagField.fDerived)
 
 
 def serialise_record_column_values(record: Record, column_names: list[str] = None, max_columns: int = 10) -> str:
