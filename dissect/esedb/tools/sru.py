@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+import argparse
+from typing import BinaryIO, Iterator, Optional
+
 from dissect.util.sid import read_sid
 from dissect.util.ts import wintimestamp, oatimestamp
 
+from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
-from dissect.esedb.records import serialise_record_column_values
-from dissect.esedb.exceptions import InvalidTable
+from dissect.esedb.record import Record, serialise_record_column_values
+from dissect.esedb.table import Table
 
 
 NATIVE_TYPE_MAP = {
@@ -45,13 +51,13 @@ NAME_TO_GUID_MAP = {
 
 
 class SRU:
-    def __init__(self, fh):
+    def __init__(self, fh: BinaryIO):
         self.esedb = EseDB(fh)
 
         id_map_table = self.esedb.table("SruDbIdMapTable")
-        self.id_map = {r.get("IdIndex"): r for r in id_map_table.get_records()}
+        self.id_map = {r.get("IdIndex"): r for r in id_map_table.records()}
 
-    def get_table(self, table_name=None, table_guid=None):
+    def get_table(self, table_name: str = None, table_guid: str = None) -> Optional[Table]:
         if all((table_name, table_guid)) or not any((table_name, table_guid)):
             raise ValueError("Either table_name or table_guid must be provided")
 
@@ -62,10 +68,10 @@ class SRU:
 
         try:
             return self.esedb.table(table_guid)
-        except InvalidTable:
+        except KeyError:
             return None
 
-    def entries(self):
+    def entries(self) -> Iterator[Entry]:
         for t in self.esedb.tables():
             if t.name in SKIP_TABLES:
                 continue
@@ -73,14 +79,14 @@ class SRU:
 
     __iter__ = entries
 
-    def get_table_entries(self, table=None, table_name=None, table_guid=None):
+    def get_table_entries(self, table: Table = None, table_name: str = None, table_guid: str = None) -> Iterator[Entry]:
         table = table or self.get_table(table_name=table_name, table_guid=table_guid)
         if not table:
             return
-        for record in table.get_records():
+        for record in table.records():
             yield Entry(self, table, record)
 
-    def resolve_id(self, value):
+    def resolve_id(self, value: int) -> Optional[str]:
         try:
             record = self.id_map[value]
         except KeyError:
@@ -96,13 +102,13 @@ class SRU:
 
 
 class Entry:
-    def __init__(self, sru, table, record):
+    def __init__(self, sru: SRU, table: Table, record: Record):
         self.sru = sru
         self.table = table
         self.record = record
         self.provider = table.name
 
-    def _get(self, attr):
+    def _get(self, attr: str) -> RecordValue:
         value = self.record.get(attr)
         if value is None:
             return value
@@ -117,22 +123,46 @@ class Entry:
         if type_map and attr in type_map:
             value = type_map[attr](value)
 
-        # Application timeline ({5C8CF1C7-7257-4F13-B223-970EF5939312})
-        # seems to have a weird null value (******** in decimal)
+        # Application timeline ({5C8CF1C7-7257-4F13-B223-970EF5939312}) seems to have a weird null value
+        # (******** in decimal)
         if self.table.name == "{5C8CF1C7-7257-4F13-B223-970EF5939312}" and value in (0x2A2A2A2A2A2A2A2A, 0x2A2A2A2A):
             value = None
 
         return value
 
-    def __getitem__(self, attr):
+    def __getitem__(self, attr: str) -> RecordValue:
         return self._get(attr)
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> RecordValue:
         try:
             return self._get(attr)
         except Exception:
             return object.__getattribute__(self, attr)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         column_values = serialise_record_column_values(self.record)
-        return f"<Entry provider={self.table.name} {column_values}"
+        return f"<Entry provider={self.table.name} {column_values}>"
+
+
+def main():
+    parser = argparse.ArgumentParser(description="dissect.esedb SRU parser")
+    parser.add_argument("input", help="SRU database to read")
+    parser.add_argument("-p", "--provider", help="filter records from this provider")
+    args = parser.parse_args()
+
+    with open(args.input, "rb") as fh:
+        parser = SRU(fh)
+
+        if args.provider in NAME_TO_GUID_MAP:
+            for e in parser.get_table_entries(table_name=args.provider):
+                print(e)
+        elif args.provider:
+            for e in parser.get_table_entries(table_guid=args.provider):
+                print(e)
+        else:
+            for e in parser.entries():
+                print(e)
+
+
+if __name__ == "__main__":
+    main()
