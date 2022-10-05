@@ -2,7 +2,7 @@
 
 A Dissect module implementing a parser for Microsofts Extensible Storage Engine Database (ESEDB), used for example in
 Active Directory, Exchange and Windows Update. For more information, please see [the
-documentation](https://dissect.readthedocs.io/en/latest/projects/dissect.esedb).
+documentation](https://docs.dissect.tools/en/latest/projects/dissect.esedb/index.html).
 
 ## Installation
 
@@ -33,12 +33,12 @@ tox
 ```
 
 For a more elaborate explanation on how to build and test the project, please see [the
-documentation](https://dissect.readthedocs.io/en/latest/contributing/developing.html#building-testing).
+documentation](https://docs.dissect.tools/en/latest/contributing/developing.html#building-testing).
 
 ## Contributing
 
 The Dissect project encourages any contribution to the codebase. To make your contribution fit into the project, please
-refer to [the style guide](https://dissect.readthedocs.io/en/latest/contributing/style-guide.html).
+refer to [the style guide](https://docs.dissect.tools/en/latest/contributing/style-guide.html).
 
 ## Copyright and license
 
