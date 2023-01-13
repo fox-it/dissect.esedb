@@ -14,6 +14,19 @@ pip install dissect.esedb
 
 This module is also automatically installed if you install the `dissect` package.
 
+## Tools
+
+### Impacket compatibility shim for secretsdump.py
+
+Since licensing prevents us from using `dissect.esedb` directly in Impacket, a compatibility shim is provided. To use
+this shim, simply install `dissect.esedb` using the instructions above, and call `secretsdump.py` like so:
+
+```bash
+python -m dissect.esedb.tools.impacket /path/to/impacket/examples/secretsdump.py -h
+```
+
+Impacket `secretsdump.py` will now use `dissect.esedb` for parsing the `NTDS.dit` file!
+
 ## Build and test instructions
 
 This project uses `tox` to build source and wheel distributions. Run the following command from the root folder to build
