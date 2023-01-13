@@ -18,14 +18,15 @@ This module is also automatically installed if you install the `dissect` package
 
 ### Impacket compatibility shim for secretsdump.py
 
-Since licensing prevents us from using `dissect.esedb` directly in Impacket, a compatibility shim is provided. To use
-this shim, simply install `dissect.esedb` using the instructions above, and call `secretsdump.py` like so:
+Impacket does not ([yet](https://github.com/fortra/impacket/pull/1452)) have native support for `dissect.esedb`,
+so in the meantime a compatibility shim is provided. To use this shim, simply install `dissect.esedb` using the 
+instructions above, and execute `secretsdump.py` like so:
 
 ```bash
 python -m dissect.esedb.tools.impacket /path/to/impacket/examples/secretsdump.py -h
 ```
 
-Impacket `secretsdump.py` will now use `dissect.esedb` for parsing the `NTDS.dit` file!
+Impacket `secretsdump.py` will now use `dissect.esedb` for parsing the `NTDS.dit` file, resulting in a nice performance improvement!
 
 ## Build and test instructions
 
