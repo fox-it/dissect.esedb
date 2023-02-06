@@ -6,7 +6,6 @@ from dissect.esedb.exceptions import (
     NoNeighbourPageError,
 )
 
-
 __all__ = [
     "EseDB",
     "Error",

@@ -5,7 +5,13 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from dissect.esedb import compression
-from dissect.esedb.c_esedb import CODEPAGE, COLUMN_TYPE_MAP, SYSOBJ, ColumnType, JET_coltyp
+from dissect.esedb.c_esedb import (
+    CODEPAGE,
+    COLUMN_TYPE_MAP,
+    SYSOBJ,
+    ColumnType,
+    JET_coltyp,
+)
 from dissect.esedb.cursor import Cursor
 from dissect.esedb.exceptions import NoNeighbourPageError
 from dissect.esedb.index import Index
