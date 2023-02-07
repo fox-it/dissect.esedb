@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
 
-from dissect.esedb.page import Page, Node
 from dissect.esedb.exceptions import KeyNotFoundError, NoNeighbourPageError
+from dissect.esedb.page import Node, Page
 
 if TYPE_CHECKING:
     from dissect.esedb.esedb import EseDB

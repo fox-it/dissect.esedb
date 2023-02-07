@@ -1,6 +1,6 @@
 import datetime
-import uuid
 import struct
+import uuid
 from collections import namedtuple
 from typing import Union
 

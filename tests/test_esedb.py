@@ -2,8 +2,8 @@ import datetime
 
 from dissect.util.ts import oatimestamp
 
-from dissect.esedb.esedb import EseDB
 from dissect.esedb.c_esedb import JET_coltyp
+from dissect.esedb.esedb import EseDB
 
 
 def test_basic_types(basic_db):

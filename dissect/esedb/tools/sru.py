@@ -4,13 +4,12 @@ import argparse
 from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.sid import read_sid
-from dissect.util.ts import wintimestamp, oatimestamp
+from dissect.util.ts import oatimestamp, wintimestamp
 
 from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
 from dissect.esedb.record import Record, serialise_record_column_values
 from dissect.esedb.table import Table
-
 
 NATIVE_TYPE_MAP = {
     "{DD6636C4-8929-4683-974E-22C046A43763}": {"ConnectStartTime": wintimestamp},

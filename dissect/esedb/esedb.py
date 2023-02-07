@@ -5,10 +5,10 @@
 from functools import cached_property, lru_cache
 from typing import BinaryIO, Iterator
 
-from dissect.esedb.page import Page
-from dissect.esedb.table import Catalog, Table
 from dissect.esedb.c_esedb import c_esedb, pgnoFDPMSO, ulDAEMagic
 from dissect.esedb.exceptions import InvalidDatabase
+from dissect.esedb.page import Page
+from dissect.esedb.table import Catalog, Table
 
 
 class EseDB:

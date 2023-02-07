@@ -9,7 +9,6 @@ from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
 from dissect.esedb.table import Table
 
-
 UalValue = Union[RecordValue, ipaddress.IPv4Address, ipaddress.IPv6Interface, Tuple[datetime.datetime]]
 
 SKIP_TABLES = [

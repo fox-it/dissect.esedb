@@ -4,7 +4,7 @@ import struct
 from functools import cached_property
 from typing import TYPE_CHECKING, Iterator, Optional, Union
 
-from dissect.esedb.c_esedb import c_esedb, PAGE_FLAG, TAG_FLAG
+from dissect.esedb.c_esedb import PAGE_FLAG, TAG_FLAG, c_esedb
 
 if TYPE_CHECKING:
     from dissect.esedb.esedb import EseDB
