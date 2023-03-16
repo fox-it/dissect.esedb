@@ -1,8 +1,29 @@
 [build-system]
-requires = ["setuptools>=43.0.0", "wheel", "setuptools_scm[toml]>=3.4.1"]
+requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
+[project]
+name = "dissect.esedb"
+description = "A Dissect module implementing a parser for Microsofts Extensible Storage Engine Database (ESEDB), used for example in Active Directory, Exchange and Windows Update"
+readme = "README.md"
+requires-python = "~=3.9"
+license.text = "Apache License 2.0"
+authors = [
+  {name = "Dissect Team", email = "dissect@fox-it.com"}
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "dissect.cstruct>=3.4.dev,<4.0.dev",
+    "dissect.util>=3.5.dev,<4.0.dev",
+]
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://dissect.tools"
+documentation = "https://docs.dissect.tools/en/latest/projects/dissect.esedb"
+repository = "https://github.com/fox-it/dissect.esedb"
 
 [tool.black]
 line-length = 120
@@ -11,3 +32,11 @@ line-length = 120
 profile = "black"
 known_first_party = ["dissect.esedb"]
 known_third_party = ["dissect"]
+
+[tool.setuptools]
+license-files = ["LICENSE", "COPYRIGHT"]
+
+[tool.setuptools.packages.find]
+include = ["dissect.*"]
+
+[tool.setuptools_scm]
