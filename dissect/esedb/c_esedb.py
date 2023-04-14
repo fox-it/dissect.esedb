@@ -77,7 +77,7 @@ struct LOGTIME {
     BYTE        fReserved:1;                        // fOSSnapshot
     BYTE        bMillisecondsHigh:3;
     BYTE        fUnused:4;
-}
+};
 
 struct LGPOS {
     USHORT      ib;                                 // must be the last so that lgpos can
