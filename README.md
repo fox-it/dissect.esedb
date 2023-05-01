@@ -6,7 +6,7 @@ documentation](https://docs.dissect.tools/en/latest/projects/dissect.esedb/index
 
 ## Installation
 
-`dissect.esedb` is available on [PyPI](https://pypi.org/project/dissect.esedb/).
+`dissect.esedb` is available on [PyPI](https://pypi.org/project/dissect.esedb/), and requires Python 3.9 or higher.
 
 ```bash
 pip install dissect.esedb
