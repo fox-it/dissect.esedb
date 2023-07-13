@@ -50,6 +50,9 @@ class Record:
         column = self._table.column(attr)
         return self._data.get(column, raw)
 
+    def serialize(self) -> dict[str, RecordValue]:
+        return self._data.serialize()
+
     def __getitem__(self, attr: str) -> RecordValue:
         return self.get(attr)
 
@@ -125,9 +128,7 @@ class RecordData:
             if num_variable > 0 and len(self.data) >= 4 + (num_variable * 2):
                 # Parse the variable offsets already, if we have them
                 # There can only be 128 at most, so this shouldn't be an expensive operation
-                self._variable_offsets = struct.unpack(
-                    "<%dH" % num_variable, self.data[self._variable_offset_start : self._variable_data_start]
-                )
+                self._variable_offsets = struct.unpack("<%dH" % num_variable, self.data[self._variable_offset_start : self._variable_data_start])
 
             self._tagged_data_start = self._variable_data_start
             if self._variable_offsets:
@@ -183,6 +184,14 @@ class RecordData:
         if value is not None:
             return self._parse_value(column, value, tag_field)
 
+    def serialize(self) -> dict[str, RecordValue]:
+        """Serialize the record columns as a dictionnary."""
+        obj = dict()
+        obj.update(self._get_all_fixed())
+        obj.update(self._get_all_variable())
+        obj.update(self._get_all_tagged())
+        return obj
+
     def _parse_value(self, column: Column, value: bytes, tag_field: TagField = None) -> RecordValue:
         """Parse the raw value into the appropriate type.
 
@@ -217,7 +226,11 @@ class RecordData:
             if tag_field and tag_field.flags & TAGFLD_HEADER.MultiValues:
                 value = list(map(parse_func, value))
             else:
-                value = parse_func(value)
+                try:
+                    value = parse_func(value)
+                except UnicodeDecodeError as e:
+                    # at least return the raw value
+                    raise RuntimeError(f"{hexlify(bytes(value)).decode()} [{type(e).__name__}: {e}]")
 
         return value
 
@@ -252,6 +265,83 @@ class RecordData:
             value[0] = compression.decompress(value[0])
 
         return value
+
+    def _get_all_fixed(self) -> dict[str, RecordValue]:
+        """Parse all fixed columns."""
+        res = dict()
+        for colid in range(self._last_fixed_id):
+            try:
+                column = self.table._column_id_map[colid]
+            except:
+                continue
+            bit_idx_identifier = colid - 1
+            bitmap_offset, bitmap_shift = divmod(bit_idx_identifier, 8)
+            if self._fixed_null_bitmap[bitmap_offset] & (1 << bitmap_shift):
+                # ignore ?
+                res[colid] = None
+            # Fixed data starts right after the header, which is 4 bytes
+            offset = 4 + column.offset
+            try:
+                res[column.name] = self._parse_value(column, self.data[offset : offset + column.size])
+            except Exception as e:
+                res[column.name] = f"!ERROR! [fixed] {e}"
+        return res
+
+    def _get_all_variable(self) -> dict[str, RecordValue]:
+        """Parse all variable columns."""
+        res = dict()
+        for idx in range(128, self._last_variable_id):
+            print("VARIABLE + %s" % self._last_variable_id)
+            column = self.table._column_id_map[idx]
+            identifier_idx = idx - 128
+            if identifier_idx == 0:
+                value_start = 0
+            else:
+                # Start of this value is the end of the previous value
+                # Even empty values have the offset encoded in them
+                value_start = self._variable_offsets[identifier_idx - 1] & 0x7FFF
+
+            # The value at the own index is the end offset of this value
+            value_end = self._variable_offsets[identifier_idx]
+
+            # If the MSB has been set, it means the entry is empty
+            if value_end & 0x8000 == 0:
+                # Offset everything with the variable data value starting offset
+                value_offset = self._variable_data_start
+                value = self.data[value_offset + value_start : value_offset + value_end]
+                try:
+                    res[column.name] = self._parse_value(column, value)
+                except Exception as e:
+                    res[column.name] = f"!ERROR! [variable] {e}"
+            else:
+                # ignore ?
+                res[column.name] = None
+        return res
+
+    def _get_all_tagged(self) -> dict[str, RecordValue]:
+        """Parse all tagged columns."""
+        res = dict()
+        for idx in range(self._tagged_data_count):
+            tag_field = self._get_tag_field(idx)
+            column = self.table._column_id_map[tag_field.identifier]
+
+            data_start = tag_field.offset
+            if tag_field.has_extended_info:
+                data_start += 1
+
+            if idx + 1 < self._tagged_data_count:
+                data_end = self._get_tag_field(idx + 1).offset
+            else:
+                data_end = len(self.data)
+
+            if not tag_field.is_null:
+                offset = self._tagged_data_start
+                value = self.data[offset + data_start : offset + data_end]
+                try:
+                    res[column.name] = self._parse_value(column, value, tag_field)
+                except Exception as e:
+                    res[column.name] = f"!ERROR! [tag] {e}"
+        return res
 
     def _get_fixed(self, column: Column) -> Optional[bytes]:
         """Parse a specific fixed column."""
