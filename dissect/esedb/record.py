@@ -187,9 +187,43 @@ class RecordData:
     def serialize(self) -> dict[str, RecordValue]:
         """Serialize the record columns as a dictionnary."""
         obj = dict()
-        obj.update(self._get_all_fixed())
-        obj.update(self._get_all_variable())
-        obj.update(self._get_all_tagged())
+        for idx in range(self._last_fixed_id):
+            try:
+                column = self.table._column_id_map[idx]
+            except:
+                continue
+            value = self._get_fixed(column)
+            try:
+                obj[column.name] = self._parse_value(column, value)
+            except Exception as e:
+                obj[column.name] = f"!ERROR! [fixed] {e}"
+
+        for idx in range(128, self._last_variable_id):
+            try:
+                column = self.table._column_id_map[idx]
+            except:
+                continue
+            value = self._get_variable(column)
+
+            try:
+                obj[column.name] = self._parse_value(column, value)
+            except Exception as e:
+                obj[column.name] = f"!ERROR! [variable] {e}"
+
+        for idx in range(self._tagged_data_count):
+            try:
+                tag_field = self._get_tag_field(idx)
+                column = self.table._column_id_map[tag_field.identifier]
+            except:
+                continue
+
+            tag_field, value = self._get_tagged(column)
+
+            try:
+                obj[column.name] = self._parse_value(column, value, tag_field)
+            except Exception as e:
+                obj[column.name] = f"!ERROR! [tag] {e}"
+
         return obj
 
     def _parse_value(self, column: Column, value: bytes, tag_field: TagField = None) -> RecordValue:
@@ -265,83 +299,6 @@ class RecordData:
             value[0] = compression.decompress(value[0])
 
         return value
-
-    def _get_all_fixed(self) -> dict[str, RecordValue]:
-        """Parse all fixed columns."""
-        res = dict()
-        for colid in range(self._last_fixed_id):
-            try:
-                column = self.table._column_id_map[colid]
-            except:
-                continue
-            bit_idx_identifier = colid - 1
-            bitmap_offset, bitmap_shift = divmod(bit_idx_identifier, 8)
-            if self._fixed_null_bitmap[bitmap_offset] & (1 << bitmap_shift):
-                # ignore ?
-                res[colid] = None
-            # Fixed data starts right after the header, which is 4 bytes
-            offset = 4 + column.offset
-            try:
-                res[column.name] = self._parse_value(column, self.data[offset : offset + column.size])
-            except Exception as e:
-                res[column.name] = f"!ERROR! [fixed] {e}"
-        return res
-
-    def _get_all_variable(self) -> dict[str, RecordValue]:
-        """Parse all variable columns."""
-        res = dict()
-        for idx in range(128, self._last_variable_id):
-            print("VARIABLE + %s" % self._last_variable_id)
-            column = self.table._column_id_map[idx]
-            identifier_idx = idx - 128
-            if identifier_idx == 0:
-                value_start = 0
-            else:
-                # Start of this value is the end of the previous value
-                # Even empty values have the offset encoded in them
-                value_start = self._variable_offsets[identifier_idx - 1] & 0x7FFF
-
-            # The value at the own index is the end offset of this value
-            value_end = self._variable_offsets[identifier_idx]
-
-            # If the MSB has been set, it means the entry is empty
-            if value_end & 0x8000 == 0:
-                # Offset everything with the variable data value starting offset
-                value_offset = self._variable_data_start
-                value = self.data[value_offset + value_start : value_offset + value_end]
-                try:
-                    res[column.name] = self._parse_value(column, value)
-                except Exception as e:
-                    res[column.name] = f"!ERROR! [variable] {e}"
-            else:
-                # ignore ?
-                res[column.name] = None
-        return res
-
-    def _get_all_tagged(self) -> dict[str, RecordValue]:
-        """Parse all tagged columns."""
-        res = dict()
-        for idx in range(self._tagged_data_count):
-            tag_field = self._get_tag_field(idx)
-            column = self.table._column_id_map[tag_field.identifier]
-
-            data_start = tag_field.offset
-            if tag_field.has_extended_info:
-                data_start += 1
-
-            if idx + 1 < self._tagged_data_count:
-                data_end = self._get_tag_field(idx + 1).offset
-            else:
-                data_end = len(self.data)
-
-            if not tag_field.is_null:
-                offset = self._tagged_data_start
-                value = self.data[offset + data_start : offset + data_end]
-                try:
-                    res[column.name] = self._parse_value(column, value, tag_field)
-                except Exception as e:
-                    res[column.name] = f"!ERROR! [tag] {e}"
-        return res
 
     def _get_fixed(self, column: Column) -> Optional[bytes]:
         """Parse a specific fixed column."""
