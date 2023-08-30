@@ -190,7 +190,7 @@ class RecordData:
 
         def _iter_column_id() -> Iterator[Column]:
             # Fixed
-            yield from range(self, self._last_fixed_id)
+            yield from range(1, self._last_fixed_id)
             
             # Variable
             yield from range(128, self._last_variable_id)
