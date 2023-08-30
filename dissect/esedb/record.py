@@ -50,8 +50,8 @@ class Record:
         column = self._table.column(attr)
         return self._data.get(column, raw)
 
-    def serialize(self) -> dict[str, RecordValue]:
-        return self._data.serialize()
+    def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
+        return self._data.as_dict(raw)
 
     def __getitem__(self, attr: str) -> RecordValue:
         return self.get(attr)
@@ -184,45 +184,28 @@ class RecordData:
         if value is not None:
             return self._parse_value(column, value, tag_field)
 
-    def serialize(self) -> dict[str, RecordValue]:
-        """Serialize the record columns as a dictionnary."""
-        obj = dict()
-        for idx in range(self._last_fixed_id):
+    def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
+        """Serialize the record as a dictionary."""
+        obj = {}
+
+        def _iter_column_id() -> Iterator[Column]:
+            # Fixed
+            yield from range(self, self._last_fixed_id)
+            
+            # Variable
+            yield from range(128, self._last_variable_id)
+
+            # Tagged
+            for idx in range(self._tagged_data_count):
+                yield self._get_tag_field(idx).identifier
+
+        for column_id in _iter_column_id():
+            column = self.table._column_id_map[column_id]
+
             try:
-                column = self.table._column_id_map[idx]
-            except:
-                continue
-            value = self._get_fixed(column)
-            try:
-                obj[column.name] = self._parse_value(column, value)
+                obj[column.name] = self.get(column, raw)
             except Exception as e:
-                obj[column.name] = f"!ERROR! [fixed] {e}"
-
-        for idx in range(128, self._last_variable_id):
-            try:
-                column = self.table._column_id_map[idx]
-            except:
-                continue
-            value = self._get_variable(column)
-
-            try:
-                obj[column.name] = self._parse_value(column, value)
-            except Exception as e:
-                obj[column.name] = f"!ERROR! [variable] {e}"
-
-        for idx in range(self._tagged_data_count):
-            try:
-                tag_field = self._get_tag_field(idx)
-                column = self.table._column_id_map[tag_field.identifier]
-            except:
-                continue
-
-            tag_field, value = self._get_tagged(column)
-
-            try:
-                obj[column.name] = self._parse_value(column, value, tag_field)
-            except Exception as e:
-                obj[column.name] = f"!ERROR! [tag] {e}"
+                obj[column.name] = f"!ERROR! {e}"
 
         return obj
 
@@ -260,11 +243,7 @@ class RecordData:
             if tag_field and tag_field.flags & TAGFLD_HEADER.MultiValues:
                 value = list(map(parse_func, value))
             else:
-                try:
-                    value = parse_func(value)
-                except UnicodeDecodeError as e:
-                    # at least return the raw value
-                    raise RuntimeError(f"{hexlify(bytes(value)).decode()} [{type(e).__name__}: {e}]")
+                value = parse_func(value)
 
         return value
 
