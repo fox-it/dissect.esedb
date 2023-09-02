@@ -4,7 +4,7 @@ import functools
 import struct
 from binascii import hexlify
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Iterator
 
 from dissect.util.xmemoryview import xmemoryview
 
