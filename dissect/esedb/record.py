@@ -4,7 +4,7 @@ import functools
 import struct
 from binascii import hexlify
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional, Iterator
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from dissect.util.xmemoryview import xmemoryview
 
@@ -128,7 +128,9 @@ class RecordData:
             if num_variable > 0 and len(self.data) >= 4 + (num_variable * 2):
                 # Parse the variable offsets already, if we have them
                 # There can only be 128 at most, so this shouldn't be an expensive operation
-                self._variable_offsets = struct.unpack("<%dH" % num_variable, self.data[self._variable_offset_start : self._variable_data_start])
+                self._variable_offsets = struct.unpack(
+                    "<%dH" % num_variable, self.data[self._variable_offset_start : self._variable_data_start]
+                )
 
             self._tagged_data_start = self._variable_data_start
             if self._variable_offsets:
@@ -190,10 +192,10 @@ class RecordData:
 
         def _iter_column_id() -> Iterator[Column]:
             # Fixed
-            yield from range(1, self._last_fixed_id)
-            
+            yield from range(1, self._last_fixed_id + 1)
+
             # Variable
-            yield from range(128, self._last_variable_id)
+            yield from range(128, self._last_variable_id + 1)
 
             # Tagged
             for idx in range(self._tagged_data_count):
