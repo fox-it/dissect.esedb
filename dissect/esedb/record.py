@@ -166,7 +166,7 @@ class RecordData:
         value = None
         tag_field = None
 
-        if not self.header:
+        if self.header is None:
             return value
 
         if column.is_fixed:
