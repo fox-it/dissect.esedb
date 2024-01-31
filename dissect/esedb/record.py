@@ -4,7 +4,7 @@ import functools
 import struct
 from binascii import hexlify
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from dissect.util.xmemoryview import xmemoryview
 
@@ -49,6 +49,9 @@ class Record:
         """
         column = self._table.column(attr)
         return self._data.get(column, raw)
+
+    def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
+        return self._data.as_dict(raw)
 
     def __getitem__(self, attr: str) -> RecordValue:
         return self.get(attr)
@@ -163,7 +166,7 @@ class RecordData:
         value = None
         tag_field = None
 
-        if not self.header:
+        if self.header is None:
             return value
 
         if column.is_fixed:
@@ -182,6 +185,31 @@ class RecordData:
 
         if value is not None:
             return self._parse_value(column, value, tag_field)
+
+    def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
+        """Serialize the record as a dictionary."""
+        obj = {}
+
+        def _iter_column_id() -> Iterator[Column]:
+            # Fixed
+            yield from range(1, self._last_fixed_id + 1)
+
+            # Variable
+            yield from range(128, self._last_variable_id + 1)
+
+            # Tagged
+            for idx in range(self._tagged_data_count):
+                yield self._get_tag_field(idx).identifier
+
+        for column_id in _iter_column_id():
+            column = self.table._column_id_map[column_id]
+
+            try:
+                obj[column.name] = self.get(column, raw)
+            except Exception as e:
+                obj[column.name] = f"!ERROR! {e}"
+
+        return obj
 
     def _parse_value(self, column: Column, value: bytes, tag_field: TagField = None) -> RecordValue:
         """Parse the raw value into the appropriate type.

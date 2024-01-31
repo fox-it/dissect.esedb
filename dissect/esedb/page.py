@@ -182,6 +182,9 @@ class Tag:
         self.size = self.tag.cb_ & mask
         self.offset = self.tag.ib_ & mask
 
+        if self.size == 0 and self.num != 0:
+            raise ValueError("Invalid TAG data, corrupt database?")
+
         self.data = self.page.data[self.offset : self.offset + self.size]
 
         flags = 0
