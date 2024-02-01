@@ -8,8 +8,7 @@ from dissect.esedb.record import Record
 
 try:
     from impacket import ese
-except ImportError:
-    print("This utility monkeypatches ESENT_DB from impacket, but impacket is not installed", file=sys.stderr)
+except (AttributeError, ImportError):
     exit(1)
 
 
