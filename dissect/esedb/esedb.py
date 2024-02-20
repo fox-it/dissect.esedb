@@ -31,6 +31,8 @@ class EseDB:
         self.fh = fh
         self.impacket_compat = impacket_compat
 
+        self.page = lru_cache(maxsize=4096)(self.page)
+
         self.header = c_esedb.DBFILEHDR(fh)
         if self.header.ulMagic != ulDAEMagic:
             raise InvalidDatabase("invalid file header signature")
@@ -82,7 +84,6 @@ class EseDB:
 
         return buf
 
-    @lru_cache(maxsize=4096)
     def page(self, num: int) -> Page:
         """Get a logical page.
 

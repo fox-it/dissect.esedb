@@ -90,6 +90,9 @@ class RecordData:
         self.node = node
         self.data = node.data
 
+        self._get_tag_field = lru_cache(4096)(self._get_tag_field)
+        self._find_tag_field_idx = lru_cache(4096)(self._find_tag_field_idx)
+
         self.header = None
         self._values = {}
 
@@ -355,12 +358,10 @@ class RecordData:
 
         return tag_field, value
 
-    @lru_cache(4096)
     def _get_tag_field(self, idx: int) -> TagField:
         """Retrieve the :class:`TagField` at the given index in the ``TAGFLD`` array."""
         return TagField(self, self._tagged_data_view[idx])
 
-    @lru_cache(4096)
     def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> Optional[TagField]:
         """Find a tag field by identifier and optional derived flag.
 
