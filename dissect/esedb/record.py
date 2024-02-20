@@ -90,9 +90,6 @@ class RecordData:
         self.node = node
         self.data = node.data
 
-        self._get_tag_field = lru_cache(4096)(self._get_tag_field)
-        self._find_tag_field_idx = lru_cache(4096)(self._find_tag_field_idx)
-
         self.header = None
         self._values = {}
 
@@ -153,6 +150,9 @@ class RecordData:
                 self._tagged_data_count = first_tagged_field.offset // 4  # sizeof(TAGFLD)
                 self._tagged_data_view = xmemoryview(tagged_field_data, "<I")
                 self._tagged_fields[first_tagged_field.identifier] = first_tagged_field
+
+        self._get_tag_field = lru_cache(4096)(self._get_tag_field)
+        self._find_tag_field_idx = lru_cache(4096)(self._find_tag_field_idx)
 
     def get(self, column: Column, raw: bool = False) -> RecordValue:
         """Retrieve the value for the specified column.

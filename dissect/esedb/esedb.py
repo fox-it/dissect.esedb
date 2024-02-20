@@ -31,8 +31,6 @@ class EseDB:
         self.fh = fh
         self.impacket_compat = impacket_compat
 
-        self.page = lru_cache(maxsize=4096)(self.page)
-
         self.header = c_esedb.DBFILEHDR(fh)
         if self.header.ulMagic != ulDAEMagic:
             raise InvalidDatabase("invalid file header signature")
@@ -46,6 +44,8 @@ class EseDB:
             raise InvalidDatabase("unsupported format revision")
 
         self.catalog = Catalog(self, pgnoFDPMSO)
+
+        self.page = lru_cache(4096)(self.page)
 
     @cached_property
     def has_small_pages(self) -> bool:
