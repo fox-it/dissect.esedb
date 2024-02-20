@@ -45,6 +45,8 @@ class EseDB:
 
         self.catalog = Catalog(self, pgnoFDPMSO)
 
+        self.page = lru_cache(4096)(self.page)
+
     @cached_property
     def has_small_pages(self) -> bool:
         """Return whether this database has small pages (<= 8K)."""
@@ -82,7 +84,6 @@ class EseDB:
 
         return buf
 
-    @lru_cache(maxsize=4096)
     def page(self, num: int) -> Page:
         """Get a logical page.
 

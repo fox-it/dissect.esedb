@@ -151,6 +151,9 @@ class RecordData:
                 self._tagged_data_view = xmemoryview(tagged_field_data, "<I")
                 self._tagged_fields[first_tagged_field.identifier] = first_tagged_field
 
+        self._get_tag_field = lru_cache(4096)(self._get_tag_field)
+        self._find_tag_field_idx = lru_cache(4096)(self._find_tag_field_idx)
+
     def get(self, column: Column, raw: bool = False) -> RecordValue:
         """Retrieve the value for the specified column.
 
@@ -355,12 +358,10 @@ class RecordData:
 
         return tag_field, value
 
-    @lru_cache(4096)
     def _get_tag_field(self, idx: int) -> TagField:
         """Retrieve the :class:`TagField` at the given index in the ``TAGFLD`` array."""
         return TagField(self, self._tagged_data_view[idx])
 
-    @lru_cache(4096)
     def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> Optional[TagField]:
         """Find a tag field by identifier and optional derived flag.
 
