@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import datetime
 import struct
 import uuid
 from collections import namedtuple
+from typing import Union
 
 from dissect.cstruct import cstruct
 
@@ -479,7 +482,7 @@ CODEPAGE_MAP = {
     CODEPAGE.ASCII: "ascii",
 }
 
-RecordValue = int | float | str | bytes | datetime.datetime | None
+RecordValue = Union[int, float, str, bytes, datetime.datetime, None]
 
 
 def decode_bit(buf: bytes) -> bool:
