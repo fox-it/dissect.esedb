@@ -146,7 +146,7 @@ class Entry:
 
     def __repr__(self) -> str:
         column_values = serialise_record_column_values(self.record)
-        return f"<Entry provider={self.table.name} {column_values}>"
+        return f"<Entry provider={self.table.name!r} {column_values}>"
 
 
 def main() -> None:

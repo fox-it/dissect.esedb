@@ -2,145 +2,209 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.esedb.exceptions import KeyNotFoundError, NoNeighbourPageError
+from dissect.esedb.btree import BTree
+from dissect.esedb.exceptions import NoNeighbourPageError
+from dissect.esedb.record import Record
 
 if TYPE_CHECKING:
-    from dissect.esedb.esedb import EseDB
-    from dissect.esedb.page import Node, Page
+    from collections.abc import Iterator
+
+    from dissect.esedb.c_esedb import RecordValue
+    from dissect.esedb.index import Index
+    from dissect.esedb.page import Node
 
 
 class Cursor:
-    """A simple cursor implementation for searching the ESE B+Trees
+    """A simple cursor implementation for searching the ESE indexes.
 
     Args:
-        esedb: An instance of :class:`~dissect.esedb.esedb.EseDB`.
-        page: The page to open a cursor on.
+        index: The :class:`~dissect.esedb.index.Index` to create the cursor for.
     """
 
-    def __init__(self, esedb: EseDB, page: int | Page):
-        self.esedb = esedb
+    def __init__(self, index: Index):
+        self.index = index
+        self.table = index.table
+        self.esedb = index.esedb
 
-        if isinstance(page, int):
-            page_num = page
-            page = esedb.page(page_num)
-        else:
-            page_num = page.num
+        self._primary = BTree(self.esedb, index.root)
+        self._secondary = None if index.is_primary else BTree(self.esedb, self.table.root)
 
-        self._page = page
-        self._page_num = page_num
-        self._node_num = 0
+    def __iter__(self) -> Iterator[Record]:
+        while True:
+            yield self._record()
 
-    def node(self) -> Node:
-        """Return the node the cursor is currently on."""
-        return self._page.node(self._node_num)
+            try:
+                self._primary.next()
+            except NoNeighbourPageError:
+                break
 
-    def next(self) -> Node:
-        """Move the cursor to the next node and return it.
+    def _node(self) -> Node:
+        """Return the node the cursor is currently on. Resolves the secondary index if needed.
 
-        Can move the cursor to the next page as a side effect.
+        Returns:
+            A :class:`~dissect.esedb.page.Node` object of the current node.
         """
-        if self._node_num + 1 > self._page.node_count - 1:
-            self.next_page()
-        else:
-            self._node_num += 1
+        node = self._primary.node()
+        if self._secondary:
+            self._secondary.reset()
+            node = self._secondary.search(node.data.tobytes(), exact=True)
+        return node
 
-        return self.node()
+    def _record(self) -> Record:
+        """Return the record the cursor is currently on.
 
-    def next_page(self) -> None:
-        """Move the cursor to the next page in the tree.
-
-        Raises:
-            NoNeighbourPageError: If the current page has no next page.
+        Returns:
+            A :class:`~dissect.esedb.record.Record` object of the current record.
         """
-        if self._page.next_page:
-            self._page = self.esedb.page(self._page.next_page)
-            self._node_num = 0
-        else:
-            raise NoNeighbourPageError(f"{self._page} has no next page")
+        return Record(self.table, self._node())
 
-    def prev(self) -> Node:
-        """Move the cursor to the previous node and return it.
+    def reset(self) -> None:
+        """Reset the internal state."""
+        self._primary.reset()
+        if self._secondary:
+            self._secondary.reset()
 
-        Can move the cursor to the previous page as a side effect.
+    def search(self, **kwargs: RecordValue) -> Record:
+        """Search the index for the requested values.
+
+        Searching modifies the cursor state. Searching again will search from the current position.
+        Reset the cursor with :meth:`reset` to start from the beginning.
+
+        Args:
+            **kwargs: The columns and values to search for.
+
+        Returns:
+            A :class:`~dissect.esedb.record.Record` object of the found record.
         """
-        if self._node_num - 1 < 0:
-            self.prev_page()
-        else:
-            self._node_num -= 1
+        key = self.index.make_key(kwargs)
+        return self.search_key(key, exact=True)
 
-        return self.node()
-
-    def prev_page(self) -> None:
-        """Move the cursor to the previous page in the tree.
-
-        Raises:
-            NoNeighbourPageError: If the current page has no previous page.
-        """
-        if self._page.previous_page:
-            self._page = self.esedb.page(self._page.previous_page)
-            self._node_num = self._page.node_count - 1
-        else:
-            raise NoNeighbourPageError(f"{self._page} has no previous page")
-
-    def search(self, key: bytes, exact: bool = True) -> Node:
-        """Search the tree for the given key.
-
-        Moves the cursor to the matching node, or on the last node that is less than the requested key.
+    def search_key(self, key: bytes, exact: bool = True) -> Record:
+        """Search for a record with the given ``key``.
 
         Args:
             key: The key to search for.
-            exact: Whether to only return successfully on an exact match.
-
-        Raises:
-            KeyNotFoundError: If an ``exact`` match was requested but not found.
+            exact: If ``True``, search for an exact match. If ``False``, sets the cursor on the
+                   next record that is greater than or equal to the key.
         """
-        page = self._page
-        while True:
-            node = find_node(page, key)
+        self._primary.search(key, exact)
+        return self._record()
 
-            if page.is_branch:
-                page = self.esedb.page(node.child)
-            else:
-                self._page = page
-                self._page_num = page.num
-                self._node_num = node.num
+    def seek(self, **kwargs: RecordValue) -> None:
+        """Seek to the record with the given values.
+
+        Args:
+            **kwargs: The columns and values to seek to.
+        """
+        key = self.index.make_key(kwargs)
+        self.search_key(key, exact=False)
+
+    def seek_key(self, key: bytes) -> None:
+        """Seek to the record with the given ``key``.
+
+        Args:
+            key: The key to seek to.
+        """
+        self._primary.search(key, exact=False)
+
+    def find(self, **kwargs: RecordValue) -> Record | None:
+        """Find a record in the index.
+
+        This differs from :meth:`search` in that it will allow additional filtering on non-indexed columns.
+
+        Args:
+            **kwargs: The columns and values to search for.
+        """
+        return next(self.find_all(**kwargs), None)
+
+    def find_all(self, **kwargs: RecordValue) -> Iterator[Record]:
+        """Find all records in the index that match the given values.
+
+        This differs from :meth:`search` in that it will allows additional filtering on non-indexed columns.
+        If you only search on indexed columns, this will yield all records that match the indexed columns.
+
+        Args:
+            **kwargs: The columns and values to search for.
+        """
+        indexed_columns = {c.name: kwargs.pop(c.name) for c in self.index.columns}
+        other_columns = kwargs
+
+        # We need at least an exact match on the indexed columns
+        self.search(**indexed_columns)
+
+        current_key = self._primary.node().key
+
+        # Check if we need to move the cursor back to find the first record
+        while True:
+            if current_key != self._primary.node().key:
+                self._primary.next()
                 break
 
-        if exact and key != node.key:
-            raise KeyNotFoundError(f"Can't find key: {key}")
+            try:
+                self._primary.prev()
+            except NoNeighbourPageError:
+                break
 
-        return self.node()
+        while True:
+            # Entries with the same indexed columns are guaranteed to be adjacent
+            if current_key != self._primary.node().key:
+                break
 
+            record = self._record()
+            for k, v in other_columns.items():
+                value = record.get(k)
+                # If the record value is a list, we do a check based on the queried value
+                if isinstance(value, list):
+                    # If the queried value is also a list, we check if they are equal
+                    if isinstance(v, list):
+                        if value != v:
+                            break
+                    # Otherwise we check if the queried value is in the record value
+                    elif v not in value:
+                        break
+                else:
+                    if value != v:
+                        break
+            else:
+                yield record
 
-def find_node(page: Page, key: bytes) -> Node:
-    """Search the tree, starting from the given ``page`` and search for ``key``.
+            try:
+                self._primary.next()
+            except NoNeighbourPageError:
+                break
 
-    Args:
-        page: The page to start searching from. Should be a branch page.
-        key: The key to search.
-    """
-    first_node_idx = 0
-    last_node_idx = page.node_count - 1
+    def record(self) -> Record:
+        """Return the record the cursor is currently on.
 
-    node = None
-    while first_node_idx < last_node_idx:
-        node_idx = (first_node_idx + last_node_idx) // 2
-        node = page.node(node_idx)
+        Returns:
+            A :class:`~dissect.esedb.record.Record` object of the current record.
+        """
+        return self._record()
 
-        # It turns out that the way BTree keys are compared matches 1:1 with how Python compares bytes
-        # First compare data, then length
-        if key < node.key:
-            last_node_idx = node_idx
-        elif key == node.key:
-            if page.is_branch:
-                # If there's an exact match on a key on a branch page, the actual leaf nodes are in the next branch
-                # Page keys for branch pages appear to be non-inclusive upper bounds
-                node_idx = min(node_idx + 1, page.node_count - 1)
-                node = page.node(node_idx)
+    def next(self) -> Record:
+        """Move the cursor to the next record and return it.
 
-            return node
-        else:
-            first_node_idx = node_idx + 1
+        Can move the cursor to the next page as a side effect.
 
-    # We're at the last node
-    return page.node(first_node_idx)
+        Returns:
+            A :class:`~dissect.esedb.record.Record` object of the next record.
+        """
+        try:
+            self._primary.next()
+        except NoNeighbourPageError:
+            raise IndexError("No next record")
+        return self._record()
+
+    def prev(self) -> Record:
+        """Move the cursor to the previous node and return it.
+
+        Can move the cursor to the previous page as a side effect.
+
+        Returns:
+            A :class:`~dissect.esedb.record.Record` object of the previous record.
+        """
+        try:
+            self._primary.prev()
+        except NoNeighbourPageError:
+            raise IndexError("No previous record")
+        return self._record()
