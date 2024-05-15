@@ -3,9 +3,9 @@ from __future__ import annotations
 import struct
 import uuid
 from functools import cached_property
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
-from dissect.esedb.c_esedb import CODEPAGE, JET_bitIndex, JET_coltyp, RecordValue
+from dissect.esedb.c_esedb import CODEPAGE, IDBFLAG, IDXFLAG, JET_coltyp, RecordValue
 from dissect.esedb.cursor import Cursor
 from dissect.esedb.lcmapstring import map_string
 from dissect.esedb.page import Node, Page
@@ -29,15 +29,24 @@ class Index(object):
         record: The record in the catalog for this index.
     """
 
-    def __init__(self, table: Table, record: Record = None):
+    def __init__(self, table: Table, record: Record | None = None):
         self.table = table
         self.record = record
         self.esedb = table.esedb
 
         self.name = record.get("Name")
-        self.flags = JET_bitIndex(record.get("Flags"))
+        flags = record.get("Flags")
+        self.idb_flags = IDBFLAG(flags & 0xFFFF)
+        self.idx_flags = IDXFLAG(flags >> 16)
         self._key_most = record.get("KeyMost") or JET_cbKeyMost_OLD
         self._var_seg_mac = record.get("VarSegMac") or self._key_most
+
+    def __repr__(self) -> str:
+        return f"<Index name={self.name!r}>"
+
+    @property
+    def is_primary(self) -> bool:
+        return bool(self.idb_flags & IDBFLAG.Primary)
 
     @cached_property
     def root(self) -> Page:
@@ -60,14 +69,17 @@ class Index(object):
         """Return a list of all columns that are used in this index."""
         return [self.table._column_id_map[cid] for cid in self.column_ids]
 
+    def cursor(self) -> Cursor:
+        """Create a new cursor for this index."""
+        return Cursor(self)
+
     def search(self, **kwargs) -> Record:
         """Search the index for the requested values.
 
-        Specify the column and value as a keyword argument.
+        Args:
+            **kwargs: The columns and values to search for.
         """
-        key = self.make_key(kwargs)
-        node = self.search_key(key)
-        return Record(self.table, node)
+        return self.cursor().search(**kwargs)
 
     def search_key(self, key: bytes) -> Node:
         """Search the index for a specific key.
@@ -75,8 +87,7 @@ class Index(object):
         Args:
             key: The key to search for.
         """
-        cursor = Cursor(self.esedb, self.root)
-        return cursor.search(key)
+        return self.cursor().search_key(key)
 
     def key_from_record(self, record: Record) -> bytes:
         """Generate a key for this index from a record.
@@ -111,9 +122,6 @@ class Index(object):
         if key_remaining < 0:
             key = key[: self._key_most]
         return key
-
-    def __repr__(self) -> str:
-        return f"<Index name={self.name}>"
 
 
 bPrefixNull = 0x00
@@ -266,7 +274,7 @@ def _encode_text(index: Index, column: Column, value: str, max_size: int) -> byt
     return bytes(key)
 
 
-def _encode_guid(value: Union[str, uuid.UUID]) -> bytes:
+def _encode_guid(value: str | uuid.UUID) -> bytes:
     if isinstance(value, str):
         value = uuid.UUID(value)
     guid_bytes = value.bytes_le

@@ -4,7 +4,7 @@ import functools
 import struct
 from binascii import hexlify
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator
 
 from dissect.util.xmemoryview import xmemoryview
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from dissect.esedb.table import Column, Table
 
 
-def noop(value: Any):
+def noop(value: Any) -> Any:
     return value
 
 
@@ -252,7 +252,7 @@ class RecordData:
 
         return value
 
-    def _parse_multivalue(self, value: bytes, tag_field: TagField):
+    def _parse_multivalue(self, value: bytes, tag_field: TagField) -> list[bytes]:
         fSeparatedInstance = 0x8000
 
         if tag_field.flags & TAGFLD_HEADER.TwoValues:
@@ -277,6 +277,8 @@ class RecordData:
                     data = self.table.get_long_value(bytes(data))
                 values.append(data)
             value = values
+        else:
+            raise ValueError(f"Unknown flags for tag field: {tag_field}")
 
         if tag_field.flags & TAGFLD_HEADER.Compressed:
             # Only the first entry appears to be compressed
@@ -284,7 +286,7 @@ class RecordData:
 
         return value
 
-    def _get_fixed(self, column: Column) -> Optional[bytes]:
+    def _get_fixed(self, column: Column) -> bytes | None:
         """Parse a specific fixed column."""
         if column.identifier <= self._last_fixed_id:
             # Check if it's not null
@@ -303,7 +305,7 @@ class RecordData:
 
         return value
 
-    def _get_variable(self, column: Column) -> Optional[bytes]:
+    def _get_variable(self, column: Column) -> bytes | None:
         """Parse a specific variable column."""
         if column.identifier <= self._last_variable_id:
             identifier_idx = column.identifier - 128
@@ -331,7 +333,7 @@ class RecordData:
 
         return value
 
-    def _get_tagged(self, column: Column) -> Optional[bytes]:
+    def _get_tagged(self, column: Column) -> bytes | None:
         """Parse a specific tagged column."""
         tag_field = None
 
@@ -362,7 +364,7 @@ class RecordData:
         """Retrieve the :class:`TagField` at the given index in the ``TAGFLD`` array."""
         return TagField(self, self._tagged_data_view[idx])
 
-    def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> Optional[TagField]:
+    def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> TagField | None:
         """Find a tag field by identifier and optional derived flag.
 
         Performs a binary search in the tagged field array for the given identifier. The comparison algorithm used is

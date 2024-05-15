@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import struct
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator
 
 from dissect.esedb import compression
+from dissect.esedb.btree import BTree
 from dissect.esedb.c_esedb import (
     CODEPAGE,
     COLUMN_TYPE_MAP,
@@ -55,7 +56,7 @@ class Table:
         self.name = name
         self.root_page = root_page
         self.columns: list[Column] = []
-        self.indexes = []
+        self.indexes: list[Index] = []
 
         # Set by the catalog during parsing
         self._long_value_record: Record = None
@@ -74,7 +75,7 @@ class Table:
         self.record = record
 
     def __repr__(self) -> str:
-        return f"<Table name={self.name}>"
+        return f"<Table name={self.name!r}>"
 
     @cached_property
     def root(self) -> Page:
@@ -112,6 +113,19 @@ class Table:
         """Return a list of all the column names."""
         return list(self._column_name_map.keys())
 
+    @property
+    def primary_index(self) -> Index | None:
+        # It's generally the first index, but loop just in case
+        for index in self.indexes:
+            if index.is_primary:
+                return index
+
+    def cursor(self) -> Cursor | None:
+        """Create a new cursor for this table."""
+        primary_idx = self.primary_index
+        if primary_idx:
+            return primary_idx.cursor()
+
     def index(self, name: str) -> Index:
         """Return the index with the given name.
 
@@ -126,6 +140,39 @@ class Table:
         except KeyError:
             raise KeyError(f"No index with this name in table {self.name}: {name}")
 
+    def find_index(self, column_names: list[str]) -> Index | None:
+        """Find the most suitable index to search for the given columns.
+
+        Args:
+            column_names: A list of column names to find the best index for.
+        """
+        best_match = 0
+        best_index = None
+        for index in self.indexes:
+            # We want to find the index that has the most matching columns in the order they are indexed
+            i = 0
+            for column in index.columns:
+                if column.name not in column_names:
+                    break
+                i += 1
+
+            if i > best_match:
+                best_index = index
+                best_match = i
+
+        return best_index
+
+    def search(self, **kwargs) -> Record | None:
+        """Search for a record in the table.
+
+        Args:
+            **kwargs: The columns and values to search for.
+
+        Returns:
+            The first record that matches the search criteria, or None if no record was found.
+        """
+        return self.cursor().search(**kwargs)
+
     def records(self) -> Iterator[Record]:
         """Return an iterator of all the records of the table."""
         for node in self.root.iter_leaf_nodes():
@@ -138,8 +185,8 @@ class Table:
             key: The lookup key for the long value.
         """
         rkey = key[::-1]
-        cursor = Cursor(self.esedb, self.lv_page)
-        header = cursor.search(rkey)
+        btree = BTree(self.esedb, self.lv_page)
+        header = btree.search(rkey)
 
         _, size = struct.unpack("<2I", header.data)
         chunks = []
@@ -147,7 +194,7 @@ class Table:
 
         while True:
             try:
-                node = cursor.next()
+                node = btree.next()
                 if not node.key.startswith(rkey):
                     break
             except NoNeighbourPageError:
@@ -199,6 +246,9 @@ class Column:
 
         self.record = record
 
+    def __repr__(self) -> str:
+        return f"<Column name={self.name!r} identifier={self.identifier:#x} type={self.type} size={self.size}>"
+
     @property
     def offset(self) -> int:
         return self._offset
@@ -231,13 +281,13 @@ class Column:
             return self.ctype.size
 
     @cached_property
-    def default(self) -> Optional[Any]:
+    def default(self) -> Any | None:
         if self.record and self.record.get("DefaultValue"):
             return self.record.get("DefaultValue")
         return None
 
     @cached_property
-    def encoding(self) -> Optional[CODEPAGE]:
+    def encoding(self) -> CODEPAGE | None:
         if self.is_text:
             return CODEPAGE(self.record.get("PagesOrLocale")) if self.record else CODEPAGE.ASCII
         return None
@@ -245,9 +295,6 @@ class Column:
     @cached_property
     def ctype(self) -> ColumnType:
         return COLUMN_TYPE_MAP[self.type.value]
-
-    def __repr__(self) -> str:
-        return f"<Column name={self.name} identifier=0x{self.identifier:x} type={self.type} size={self.size}>"
 
 
 class Catalog:

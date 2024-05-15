@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Iterator
 
 from dissect.esedb.c_esedb import PAGE_FLAG, TAG_FLAG, c_esedb
 
@@ -81,7 +81,7 @@ class Page:
         return not self.is_leaf
 
     @cached_property
-    def key_prefix(self) -> Optional[bytes]:
+    def key_prefix(self) -> bytes | None:
         if not self.is_root:
             return bytes(self.tag(0).data)
 
@@ -104,7 +104,7 @@ class Page:
         for i in range(1, self.tag_count):
             yield self.tag(i)
 
-    def node(self, num: int) -> Union[BranchNode, LeafNode]:
+    def node(self, num: int) -> BranchNode | LeafNode:
         """Retrieve a node by index.
 
         Nodes are just tags, but indexed from the first tag.
@@ -123,7 +123,7 @@ class Page:
 
         return self._node_cache[num]
 
-    def nodes(self) -> Iterator[Union[BranchNode, LeafNode]]:
+    def nodes(self) -> Iterator[BranchNode | LeafNode]:
         """Yield all nodes."""
         for i in range(self.node_count):
             yield self.node(i)
@@ -200,7 +200,7 @@ class Tag:
         self.flags = TAG_FLAG(flags)
 
     def __repr__(self) -> str:
-        return f"<Tag offset=0x{self.offset:x} size=0x{self.size:x}>"
+        return f"<Tag offset={self.offset:#x} size={self.size:#x}>"
 
 
 class Node:
