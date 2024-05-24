@@ -39,6 +39,7 @@ class Cursor:
         """Return the node the cursor is currently on. Resolves the secondary index if needed."""
         node = self._first.node()
         if self._secondary:
+            self._secondary.reset()
             node = self._secondary.search(node.data.tobytes(), exact=True)
         return node
 
