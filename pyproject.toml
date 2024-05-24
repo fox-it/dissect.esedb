@@ -25,8 +25,8 @@ classifiers = [
   "Topic :: Utilities",
 ]
 dependencies = [
-    "dissect.cstruct>=3.4.dev,<4.0.dev",
-    "dissect.util>=3.5.dev,<4.0.dev",
+    "dissect.cstruct>3,<5",
+    "dissect.util>3.4,<4",
 ]
 dynamic = ["version"]
 
