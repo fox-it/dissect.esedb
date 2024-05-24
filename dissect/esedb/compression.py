@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import struct
-from typing import Optional
 
 from dissect.util.compression import lzxpress, sevenbit
 
@@ -29,7 +30,7 @@ def decompress(buf: bytes) -> bytes:
         return buf
 
 
-def decompress_size(buf: bytes) -> Optional[int]:
+def decompress_size(buf: bytes) -> int | None:
     """Return the decompressed size of the given bytes according to the encoded compression scheme.
 
     Args:

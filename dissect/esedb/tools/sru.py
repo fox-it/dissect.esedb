@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import BinaryIO, Iterator, Optional
+from typing import BinaryIO, Iterator
 
 from dissect.util.sid import read_sid
 from dissect.util.ts import oatimestamp, wintimestamp
@@ -56,7 +56,7 @@ class SRU:
         id_map_table = self.esedb.table("SruDbIdMapTable")
         self.id_map = {r.get("IdIndex"): r for r in id_map_table.records()}
 
-    def get_table(self, table_name: str = None, table_guid: str = None) -> Optional[Table]:
+    def get_table(self, table_name: str = None, table_guid: str = None) -> Table | None:
         if all((table_name, table_guid)) or not any((table_name, table_guid)):
             raise ValueError("Either table_name or table_guid must be provided")
 
@@ -85,7 +85,7 @@ class SRU:
         for record in table.records():
             yield Entry(self, table, record)
 
-    def resolve_id(self, value: int) -> Optional[str]:
+    def resolve_id(self, value: int) -> str | None:
         try:
             record = self.id_map[value]
         except KeyError:
@@ -140,7 +140,7 @@ class Entry:
 
     def __repr__(self) -> str:
         column_values = serialise_record_column_values(self.record)
-        return f"<Entry provider={self.table.name} {column_values}>"
+        return f"<Entry provider={self.table.name!r} {column_values}>"
 
 
 def main():

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import datetime
 import struct
 import uuid
 from collections import namedtuple
 from typing import Union
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 # https://github.com/microsoft/Extensible-Storage-Engine
 c_esedb_def = """
@@ -425,10 +427,37 @@ flag JET_bitIndex : uint32 {
     DotNetGuid              = 0x00040000,           // index over GUID column according to .Net GUID sort order
     ImmutableStructure      = 0x00080000,           // Do not write to the input structures during a JetCreateIndexN call.
 };
+
+flag IDBFLAG : uint16 {
+    Unique                  = 0x0001,               // Duplicate keys not allowed
+    AllowAllNulls           = 0x0002,               // Make entries for NULL keys (all segments are null)
+    AllowFirstNull          = 0x0004,               // First index column NULL allowed in index
+    AllowSomeNulls          = 0x0008,               // Make entries for keys with some null segments
+    NoNullSeg               = 0x0010,               // Don't allow a NULL key segment
+    Primary                 = 0x0020,               // Index is the primary index
+    LocaleSet               = 0x0040,               // Index locale information (locale name) is set (JET_bitIndexUnicode was specified).
+    Multivalued             = 0x0080,               // Has a multivalued segment
+    TemplateIndex           = 0x0100,               // Index of a template table
+    DerivedIndex            = 0x0200,               // Index derived from template table
+                                                    //   Note that this flag is persisted, but
+                                                    //   never used in an in-memory IDB, because
+                                                    //   we use the template index IDB instead.
+    LocalizedText           = 0x0400,               // Has a unicode text column? (code page is 1200)
+    SortNullsHigh           = 0x0800,               // NULL sorts after data
+    // Jan 2012: MSU is being removed. fidbUnicodeFixupOn should no longer be referenced.
+    UnicodeFixupOn_Deprecated   = 0x1000,           // Track entries with undefined Unicode codepoints
+    CrossProduct            = 0x2000,               // all combinations of multi-valued columns are indexed
+    DisallowTruncation      = 0x4000,               // fail update rather than allow key truncation
+    NestedTable             = 0x8000,               // combinations of multi-valued columns of same itagSequence are indexed
+};
+
+flag IDXFLAG : uint16 {
+    ExtendedColumns         = 0x0001,               // IDXSEGs are comprised of JET_COLUMNIDs, not FIDs
+    DotNetGuid              = 0x0002,               // GUIDs sort according to .Net rules
+};
 """  # noqa E501
 
-c_esedb = cstruct.cstruct()
-c_esedb.load(c_esedb_def)
+c_esedb = cstruct().load(c_esedb_def)
 
 ulDAEMagic = 0x89ABCDEF
 pgnoFDPMSO = 4
@@ -444,6 +473,8 @@ TAG_FLAG = c_esedb.TAG_FLAG
 TAGFLD_HEADER = c_esedb.TAGFLD_HEADER
 CODEPAGE = c_esedb.CODEPAGE
 COMPRESSION_SCHEME = c_esedb.COMPRESSION_SCHEME
+IDBFLAG = c_esedb.IDBFLAG
+IDXFLAG = c_esedb.IDXFLAG
 
 CODEPAGE_MAP = {
     CODEPAGE.UNICODE: "utf-16-le",

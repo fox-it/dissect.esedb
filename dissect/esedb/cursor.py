@@ -1,146 +1,172 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Iterator
 
-from dissect.esedb.exceptions import KeyNotFoundError, NoNeighbourPageError
-from dissect.esedb.page import Node, Page
+from dissect.esedb.btree import BTree
+from dissect.esedb.exceptions import NoNeighbourPageError
+from dissect.esedb.record import Record
 
 if TYPE_CHECKING:
-    from dissect.esedb.esedb import EseDB
+    from dissect.esedb.index import Index
+    from dissect.esedb.page import Node
 
 
 class Cursor:
-    """A simple cursor implementation for searching the ESE B+Trees
+    """A simple cursor implementation for searching the ESE indexes.
 
     Args:
-        esedb: An instance of :class:`~dissect.esedb.esedb.EseDB`.
-        page: The page to open a cursor on.
+        index: The index to create the cursor for.
     """
 
-    def __init__(self, esedb: EseDB, page: Union[int, Page]):
-        self.esedb = esedb
+    def __init__(self, index: Index):
+        self.index = index
+        self.table = index.table
+        self.esedb = index.esedb
 
-        if isinstance(page, int):
-            page_num = page
-            page = esedb.page(page_num)
-        else:
-            page_num = page.num
+        self._first = BTree(self.esedb, index.root)
+        self._secondary = None if index.is_primary else BTree(self.esedb, self.table.root)
 
-        self._page = page
-        self._page_num = page_num
-        self._node_num = 0
+    def __iter__(self) -> Iterator[Record]:
+        while True:
+            yield self._record()
 
-    def node(self) -> Node:
-        """Return the node the cursor is currently on."""
-        return self._page.node(self._node_num)
+            try:
+                self._first.next()
+            except NoNeighbourPageError:
+                break
 
-    def next(self) -> Node:
-        """Move the cursor to the next node and return it.
+    def _node(self) -> Node:
+        """Return the node the cursor is currently on. Resolves the secondary index if needed."""
+        node = self._first.node()
+        if self._secondary:
+            self._secondary.reset()
+            node = self._secondary.search(node.data.tobytes(), exact=True)
+        return node
+
+    def _record(self) -> Record:
+        """Return the record the cursor is currently on."""
+        return Record(self.table, self._node())
+
+    def reset(self) -> None:
+        """Reset the internal state."""
+        self._first.reset()
+        if self._secondary:
+            self._secondary.reset()
+
+    def search(self, **kwargs) -> Record:
+        """Search the index for the requested values.
+
+        Searching modifies the cursor state. Searching again will search from the current position.
+        Reset the cursor with :meth:`reset` to start from the beginning.
+
+        Args:
+            **kwargs: The columns and values to search for.
+        """
+        key = self.index.make_key(kwargs)
+        return self.search_key(key, exact=True)
+
+    def search_key(self, key: bytes, exact: bool = True) -> Record:
+        """Search for a record with the given key.
+
+        Args:
+            key: The key to search for.
+            exact: If ``True``, search for an exact match. If ``False``, sets the cursor on the
+                   next record that is greater than or equal to the key.
+        """
+        self._first.search(key, exact)
+        return self._record()
+
+    def seek(self, **kwargs) -> None:
+        """Seek to the record with the given values.
+
+        Args:
+            **kwargs: The columns and values to seek to.
+        """
+        key = self.index.make_key(kwargs)
+        self.search_key(key, exact=False)
+
+    def seek_key(self, key: bytes) -> None:
+        """Seek to the record with the given key.
+
+        Args:
+            key: The key to seek to.
+        """
+        self._first.search(key, exact=False)
+
+    def find(self, **kwargs) -> Record | None:
+        """Find a record in the index.
+
+        This differs from :meth:`search` in that it will allow additional filtering on non-indexed columns.
+
+        Args:
+            **kwargs: The columns and values to search for.
+        """
+        return next(self.find_all(**kwargs), None)
+
+    def find_all(self, **kwargs) -> Iterator[Record]:
+        """Find all records in the index that match the given values.
+
+        This differs from :meth:`search` in that it will allows additional filtering on non-indexed columns.
+        If you only search on indexed columns, this will yield all records that match the indexed columns.
+
+        Args:
+            **kwargs: The columns and values to search for.
+        """
+        indexed_columns = {c.name: kwargs.pop(c.name) for c in self.index.columns}
+        other_columns = kwargs
+
+        # We need at least an exact match on the indexed columns
+        self.search(**indexed_columns)
+
+        current_key = self._first.node().key
+
+        # Check if we need to move the cursor back to find the first record
+        while True:
+            if current_key != self._first.node().key:
+                self._first.next()
+                break
+
+            try:
+                self._first.prev()
+            except NoNeighbourPageError:
+                break
+
+        while True:
+            # Entries with the same indexed columns are guaranteed to be adjacent
+            if current_key != self._first.node().key:
+                break
+
+            record = self._record()
+            if all(record.get(k) == v for k, v in other_columns.items()):
+                yield record
+
+            try:
+                self._first.next()
+            except NoNeighbourPageError:
+                break
+
+    def record(self) -> Record:
+        """Return the record the cursor is currently on."""
+        return self._record()
+
+    def next(self) -> Record:
+        """Move the cursor to the next record and return it.
 
         Can move the cursor to the next page as a side effect.
         """
-        if self._node_num + 1 > self._page.node_count - 1:
-            self.next_page()
-        else:
-            self._node_num += 1
+        try:
+            self._first.next()
+        except NoNeighbourPageError:
+            raise IndexError("No next record")
+        return self._record()
 
-        return self.node()
-
-    def next_page(self) -> None:
-        """Move the cursor to the next page in the tree.
-
-        Raises:
-            NoNeighbourPageError: If the current page has no next page.
-        """
-        if self._page.next_page:
-            self._page = self.esedb.page(self._page.next_page)
-            self._node_num = 0
-        else:
-            raise NoNeighbourPageError(f"{self._page} has no next page")
-
-    def prev(self) -> Node:
+    def prev(self) -> Record:
         """Move the cursor to the previous node and return it.
 
         Can move the cursor to the previous page as a side effect.
         """
-        if self._node_num - 1 < 0:
-            self.prev_page()
-        else:
-            self._node_num -= 1
-
-        return self.node()
-
-    def prev_page(self) -> None:
-        """Move the cursor to the previous page in the tree.
-
-        Raises:
-            NoNeighbourPageError: If the current page has no previous page.
-        """
-        if self._page.previous_page:
-            self._page = self.esedb.page(self._page.previous_page)
-            self._node_num = self._page.node_count - 1
-        else:
-            raise NoNeighbourPageError(f"{self._page} has no previous page")
-
-    def search(self, key: bytes, exact: bool = True) -> Node:
-        """Search the tree for the given key.
-
-        Moves the cursor to the matching node, or on the last node that is less than the requested key.
-
-        Args:
-            key: The key to search for.
-            exact: Whether to only return successfully on an exact match.
-
-        Raises:
-            KeyNotFoundError: If an ``exact`` match was requested but not found.
-        """
-        page = self._page
-        while True:
-            node = find_node(page, key)
-
-            if page.is_branch:
-                page = self.esedb.page(node.child)
-            else:
-                self._page = page
-                self._page_num = page.num
-                self._node_num = node.num
-                break
-
-        if exact and key != node.key:
-            raise KeyNotFoundError(f"Can't find key: {key}")
-
-        return self.node()
-
-
-def find_node(page: Page, key: bytes) -> Node:
-    """Search the tree, starting from the given ``page`` and search for ``key``.
-
-    Args:
-        page: The page to start searching from. Should be a branch page.
-        key: The key to search.
-    """
-    first_node_idx = 0
-    last_node_idx = page.node_count - 1
-
-    node = None
-    while first_node_idx < last_node_idx:
-        node_idx = (first_node_idx + last_node_idx) // 2
-        node = page.node(node_idx)
-
-        # It turns out that the way BTree keys are compared matches 1:1 with how Python compares bytes
-        # First compare data, then length
-        if key < node.key:
-            last_node_idx = node_idx
-        elif key == node.key:
-            if page.is_branch:
-                # If there's an exact match on a key on a branch page, the actual leaf nodes are in the next branch
-                # Page keys for branch pages appear to be non-inclusive upper bounds
-                node_idx = min(node_idx + 1, page.node_count - 1)
-                node = page.node(node_idx)
-
-            return node
-        else:
-            first_node_idx = node_idx + 1
-
-    # We're at the last node
-    return page.node(first_node_idx)
+        try:
+            self._first.prev()
+        except NoNeighbourPageError:
+            raise IndexError("No previous record")
+        return self._record()

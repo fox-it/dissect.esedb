@@ -212,7 +212,7 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
     )
 
 
-def _filter_weights(weights):
+def _filter_weights(weights: list[int]) -> list[int]:
     i = len(weights)
     while i > 0:
         if weights[i - 1] > 2:
