@@ -4,10 +4,10 @@ import uuid
 from collections import namedtuple
 from typing import Union
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 # https://github.com/microsoft/Extensible-Storage-Engine
-c_esedb_def = """
+esedb_def = """
 #define MAX_COMPUTERNAME_LENGTH 15
 
 typedef int64 DBTIME;
@@ -427,8 +427,7 @@ flag JET_bitIndex : uint32 {
 };
 """  # noqa E501
 
-c_esedb = cstruct.cstruct()
-c_esedb.load(c_esedb_def)
+c_esedb = cstruct().load(esedb_def)
 
 ulDAEMagic = 0x89ABCDEF
 pgnoFDPMSO = 4
