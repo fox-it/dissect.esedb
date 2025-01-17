@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import argparse
-from typing import BinaryIO, Iterator, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.sid import read_sid
 from dissect.util.ts import oatimestamp, wintimestamp
 
-from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
 from dissect.esedb.record import Record, serialise_record_column_values
-from dissect.esedb.table import Table
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.esedb.c_esedb import RecordValue
+    from dissect.esedb.table import Table
 
 NATIVE_TYPE_MAP = {
     "{DD6636C4-8929-4683-974E-22C046A43763}": {"ConnectStartTime": wintimestamp},
@@ -56,7 +61,7 @@ class SRU:
         id_map_table = self.esedb.table("SruDbIdMapTable")
         self.id_map = {r.get("IdIndex"): r for r in id_map_table.records()}
 
-    def get_table(self, table_name: str = None, table_guid: str = None) -> Optional[Table]:
+    def get_table(self, table_name: str | None = None, table_guid: str | None = None) -> Table | None:
         if all((table_name, table_guid)) or not any((table_name, table_guid)):
             raise ValueError("Either table_name or table_guid must be provided")
 
@@ -78,14 +83,16 @@ class SRU:
 
     __iter__ = entries
 
-    def get_table_entries(self, table: Table = None, table_name: str = None, table_guid: str = None) -> Iterator[Entry]:
+    def get_table_entries(
+        self, table: Table = None, table_name: str | None = None, table_guid: str | None = None
+    ) -> Iterator[Entry]:
         table = table or self.get_table(table_name=table_name, table_guid=table_guid)
         if not table:
             return
         for record in table.records():
             yield Entry(self, table, record)
 
-    def resolve_id(self, value: int) -> Optional[str]:
+    def resolve_id(self, value: int) -> str | None:
         try:
             record = self.id_map[value]
         except KeyError:
@@ -96,8 +103,7 @@ class SRU:
 
         if record.get("IdType") in (0, 1, 2):
             return record.get("IdBlob").decode("utf-16-le").rstrip("\x00")
-        else:
-            return read_sid(record.get("IdBlob"))
+        return read_sid(record.get("IdBlob"))
 
 
 class Entry:
@@ -143,13 +149,13 @@ class Entry:
         return f"<Entry provider={self.table.name} {column_values}>"
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="dissect.esedb SRU parser")
     parser.add_argument("input", help="SRU database to read")
     parser.add_argument("-p", "--provider", help="filter records from this provider")
     args = parser.parse_args()
 
-    with open(args.input, "rb") as fh:
+    with Path(args.input).open("rb") as fh:
         parser = SRU(fh)
 
         if args.provider in NAME_TO_GUID_MAP:

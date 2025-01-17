@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import datetime
 import struct
 import uuid
-from collections import namedtuple
-from typing import Union
+from typing import NamedTuple, Union
 
 from dissect.cstruct import cstruct
 
@@ -493,7 +494,12 @@ def checksum_xor(data: bytes, initial: int = 0x89ABCDEF) -> int:
     return digest
 
 
-ColumnType = namedtuple("ColumnType", ["value", "name", "size", "parse"])
+class ColumnType(NamedTuple):
+    value: int
+    name: str
+    size: int | None
+    parse: callable | None
+
 
 COLUMN_TYPES = [
     ColumnType(JET_coltyp.Nil, "NULL", 0, None),

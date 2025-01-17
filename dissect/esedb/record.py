@@ -4,7 +4,7 @@ import functools
 import struct
 from binascii import hexlify
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import TYPE_CHECKING, Any
 
 from dissect.util.xmemoryview import xmemoryview
 
@@ -12,11 +12,13 @@ from dissect.esedb import compression
 from dissect.esedb.c_esedb import PAGE_FLAG, TAGFLD_HEADER, RecordValue, c_esedb
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.esedb.page import Node
     from dissect.esedb.table import Column, Table
 
 
-def noop(value: Any):
+def noop(value: Any) -> Any:
     return value
 
 
@@ -129,7 +131,7 @@ class RecordData:
                 # Parse the variable offsets already, if we have them
                 # There can only be 128 at most, so this shouldn't be an expensive operation
                 self._variable_offsets = struct.unpack(
-                    "<%dH" % num_variable, self.data[self._variable_offset_start : self._variable_data_start]
+                    f"<{num_variable}H", self.data[self._variable_offset_start : self._variable_data_start]
                 )
 
             self._tagged_data_start = self._variable_data_start
@@ -189,6 +191,8 @@ class RecordData:
         if value is not None:
             return self._parse_value(column, value, tag_field)
 
+        return None
+
     def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
         """Serialize the record as a dictionary."""
         obj = {}
@@ -229,7 +233,7 @@ class RecordData:
                 value = None
             elif tag_field and tag_field.flags & TAGFLD_HEADER.MultiValues:
                 value = hexlify(value)
-            elif parse_func != bytes:
+            elif parse_func is not bytes:
                 value = parse_func(value)
             else:
                 value = hexlify(value)
@@ -252,7 +256,7 @@ class RecordData:
 
         return value
 
-    def _parse_multivalue(self, value: bytes, tag_field: TagField):
+    def _parse_multivalue(self, value: bytes, tag_field: TagField) -> bytes:
         fSeparatedInstance = 0x8000
 
         if tag_field.flags & TAGFLD_HEADER.TwoValues:
@@ -267,7 +271,7 @@ class RecordData:
             # Individual offsets can have a fSeparatedInstance (0x8000) flag set
             first_value_offset = struct.unpack("<H", value[0:2])[0] & 0x7FFF
             num_values = first_value_offset // 2  # sizeof(USHORT)
-            value_offsets = struct.unpack(f"<{num_values}H", value[:first_value_offset]) + (len(value),)
+            value_offsets = (*struct.unpack(f"<{num_values}H", value[:first_value_offset]), len(value))
 
             values = []
             for i in range(num_values):
@@ -284,7 +288,7 @@ class RecordData:
 
         return value
 
-    def _get_fixed(self, column: Column) -> Optional[bytes]:
+    def _get_fixed(self, column: Column) -> bytes | None:
         """Parse a specific fixed column."""
         if column.identifier <= self._last_fixed_id:
             # Check if it's not null
@@ -303,16 +307,14 @@ class RecordData:
 
         return value
 
-    def _get_variable(self, column: Column) -> Optional[bytes]:
+    def _get_variable(self, column: Column) -> bytes | None:
         """Parse a specific variable column."""
         if column.identifier <= self._last_variable_id:
             identifier_idx = column.identifier - 128
-            if identifier_idx == 0:
-                value_start = 0
-            else:
-                # Start of this value is the end of the previous value
-                # Even empty values have the offset encoded in them
-                value_start = self._variable_offsets[identifier_idx - 1] & 0x7FFF
+
+            # Start of this value is the end of the previous value
+            # Even empty values have the offset encoded in them
+            value_start = 0 if identifier_idx == 0 else self._variable_offsets[identifier_idx - 1] & 32767
 
             # The value at the own index is the end offset of this value
             value_end = self._variable_offsets[identifier_idx]
@@ -331,7 +333,7 @@ class RecordData:
 
         return value
 
-    def _get_tagged(self, column: Column) -> Optional[bytes]:
+    def _get_tagged(self, column: Column) -> bytes | None:
         """Parse a specific tagged column."""
         tag_field = None
 
@@ -343,10 +345,7 @@ class RecordData:
             if tag_field.has_extended_info:
                 data_start += 1
 
-            if idx + 1 < self._tagged_data_count:
-                data_end = self._get_tag_field(idx + 1).offset
-            else:
-                data_end = len(self.data)
+            data_end = self._get_tag_field(idx + 1).offset if idx + 1 < self._tagged_data_count else len(self.data)
 
             if not tag_field.is_null:
                 offset = self._tagged_data_start
@@ -362,7 +361,7 @@ class RecordData:
         """Retrieve the :class:`TagField` at the given index in the ``TAGFLD`` array."""
         return TagField(self, self._tagged_data_view[idx])
 
-    def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> Optional[TagField]:
+    def _find_tag_field_idx(self, identifier: int, is_derived: bool = False) -> TagField | None:
         """Find a tag field by identifier and optional derived flag.
 
         Performs a binary search in the tagged field array for the given identifier. The comparison algorithm used is
@@ -413,7 +412,7 @@ class RecordData:
 class TagField:
     """Represents a ``TAGFLD``, which contains information about a tagged field in a record."""
 
-    __slots__ = ("record", "identifier", "_offset", "offset", "has_extended_info", "flags")
+    __slots__ = ("_offset", "flags", "has_extended_info", "identifier", "offset", "record")
 
     fNullSmallPage = 0x2000
     fDerived = 0x8000
@@ -443,8 +442,7 @@ class TagField:
         """Return whether this tagged field is null."""
         if self.record.esedb.has_small_pages:
             return bool(self._offset & TagField.fNullSmallPage)
-        else:
-            return bool(self.flags & TAGFLD_HEADER.Null)
+        return bool(self.flags & TAGFLD_HEADER.Null)
 
     @property
     def is_derived(self) -> bool:
@@ -452,7 +450,7 @@ class TagField:
         return bool(self._offset & TagField.fDerived)
 
 
-def serialise_record_column_values(record: Record, column_names: list[str] = None, max_columns: int = 10) -> str:
+def serialise_record_column_values(record: Record, column_names: list[str] | None = None, max_columns: int = 10) -> str:
     column_names = column_names or record._table.column_names
     columns_with_values = []
     for name in column_names:

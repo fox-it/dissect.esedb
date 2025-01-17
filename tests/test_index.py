@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+from typing import BinaryIO
+
 from dissect.esedb.esedb import EseDB
 
 
-def test_index(index_db):
+def test_index(index_db: BinaryIO) -> None:
     db = EseDB(index_db)
     table = db.table("index")
 

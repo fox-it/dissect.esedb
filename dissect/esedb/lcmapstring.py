@@ -181,7 +181,7 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
             key_case.append(case_weight)
             continue
 
-        if script_member == SCRIPT.DIGIT and 0:
+        if script_member == SCRIPT.DIGIT:
             raise NotImplementedError(SCRIPT.DIGIT)
 
         # else
@@ -191,10 +191,7 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
         key_case.append(case_weight)
 
     key_diacritic = _filter_weights(key_diacritic)
-    if flags & (MapFlags.NORM_IGNORECASE | MapFlags.NORM_IGNOREWIDTH):
-        key_case = []
-    else:
-        key_case = _filter_weights(key_case)
+    key_case = [] if flags & (MapFlags.NORM_IGNORECASE | MapFlags.NORM_IGNOREWIDTH) else _filter_weights(key_case)
 
     return bytes(
         [
@@ -212,7 +209,7 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
     )
 
 
-def _filter_weights(weights):
+def _filter_weights(weights: list[int]) -> list[int]:
     i = len(weights)
     while i > 0:
         if weights[i - 1] > 2:

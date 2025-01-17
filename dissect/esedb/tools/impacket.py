@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import runpy
 import sys
-from typing import Any, Iterator
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from dissect.esedb import EseDB
-from dissect.esedb.c_esedb import RecordValue
-from dissect.esedb.record import Record
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.esedb.c_esedb import RecordValue
+    from dissect.esedb.record import Record
 
 try:
     from impacket import ese
@@ -20,14 +27,14 @@ class ESENT_DB:
             self.fh = fileName
             self.fh.open()
         else:
-            self.fh = open(fileName, "rb")
+            self.fh = Path(fileName).open("rb")  # noqa: SIM115
         self.db = EseDB(self.fh, impacket_compat=True)
 
     def openTable(self, tableName: str) -> Iterator[Record]:
         # Impacket only ever asks for the "next" record, so our cursor can simply be the record iterator
         return self.db.table(tableName).records()
 
-    def getNextRow(self, cursor: Iterator[Record], filter_tables: list[str] = None):
+    def getNextRow(self, cursor: Iterator[Record], filter_tables: list[str] | None = None) -> RecordWrapper | None:
         # Impacket uses a list to filter column names to make parsing a bit more efficient, but our parsing already
         # skips columns you don't request the value for
         try:
@@ -36,7 +43,7 @@ class ESENT_DB:
         except StopIteration:
             return None
 
-    def close(self):
+    def close(self) -> None:
         self.fh.close()
 
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from dissect.esedb.exceptions import KeyNotFoundError, NoNeighbourPageError
-from dissect.esedb.page import Node, Page
 
 if TYPE_CHECKING:
     from dissect.esedb.esedb import EseDB
+    from dissect.esedb.page import Node, Page
 
 
 class Cursor:
@@ -17,7 +17,7 @@ class Cursor:
         page: The page to open a cursor on.
     """
 
-    def __init__(self, esedb: EseDB, page: Union[int, Page]):
+    def __init__(self, esedb: EseDB, page: int | Page):
         self.esedb = esedb
 
         if isinstance(page, int):

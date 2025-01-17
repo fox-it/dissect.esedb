@@ -1,7 +1,9 @@
 import argparse
 import datetime
 import ipaddress
-from typing import BinaryIO, Iterator, Tuple, Union
+from collections.abc import Iterator
+from pathlib import Path
+from typing import BinaryIO, Union
 
 from dissect.util.ts import wintimestamp
 
@@ -9,7 +11,7 @@ from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
 from dissect.esedb.table import Table
 
-UalValue = Union[RecordValue, ipaddress.IPv4Address, ipaddress.IPv6Interface, Tuple[datetime.datetime]]
+UalValue = Union[RecordValue, ipaddress.IPv4Address, ipaddress.IPv6Interface, tuple[datetime.datetime]]
 
 SKIP_TABLES = [
     "MSysObjects",
@@ -81,16 +83,16 @@ class UAL:
             yield record_data
 
 
-def convert_day_num_to_date(year, day_num):
-    return datetime.datetime(year, 1, 1) + datetime.timedelta(day_num - 1)
+def convert_day_num_to_date(year: int, day_num: int) -> datetime.datetime:
+    return datetime.datetime(year, 1, 1, tzinfo=datetime.timezone.utc) + datetime.timedelta(day_num - 1)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="dissect.esedb UAL parser")
     parser.add_argument("input", help="UAL database to read")
     args = parser.parse_args()
 
-    with open(args.input, "rb") as fh:
+    with Path(args.input).open("rb") as fh:
         parser = UAL(fh)
 
         for table in parser.get_tables():

@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+from typing import BinaryIO
+
 from dissect.esedb.tools.ual import UAL
 
 
-def test_ual(ual_db):
+def test_ual(ual_db: BinaryIO) -> None:
     db = UAL(ual_db)
 
     assert len(list(db.get_table_records("CLIENTS"))) == 19

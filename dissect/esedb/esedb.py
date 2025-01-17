@@ -1,14 +1,19 @@
 # Extensible Storage Engine (ESE) Database implementation
 # Combination of pre-source release reverse engineering and post-source release cleanup
 # Reference: https://github.com/microsoft/Extensible-Storage-Engine
+from __future__ import annotations
 
+import io
 from functools import cached_property, lru_cache
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.esedb.c_esedb import c_esedb, pgnoFDPMSO, ulDAEMagic
 from dissect.esedb.exceptions import InvalidDatabase
 from dissect.esedb.page import Page
 from dissect.esedb.table import Catalog, Table
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class EseDB:
@@ -98,10 +103,6 @@ class EseDB:
 
     def pages(self) -> Iterator[Page]:
         """Iterate over all pages."""
-        num = 1
-        while True:
-            try:
-                yield self.page(num)
-                num += 1
-            except IndexError:
-                break
+        size = self.fh.seek(0, io.SEEK_END)
+        for i in range(1, (size // self.page_size) - 1):
+            yield self.page(i)

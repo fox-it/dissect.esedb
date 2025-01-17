@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from typing import BinaryIO
 
 from dissect.esedb.esedb import EseDB
 
 
-def test_as_dict(basic_db: BinaryIO):
+def test_as_dict(basic_db: BinaryIO) -> None:
     db = EseDB(basic_db)
     table = db.table("basic")
 

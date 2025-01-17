@@ -3,22 +3,22 @@ from __future__ import annotations
 import struct
 import uuid
 from functools import cached_property
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from dissect.esedb.c_esedb import CODEPAGE, JET_bitIndex, JET_coltyp, RecordValue
 from dissect.esedb.cursor import Cursor
 from dissect.esedb.lcmapstring import map_string
-from dissect.esedb.page import Node, Page
 from dissect.esedb.record import Record
 
 if TYPE_CHECKING:
+    from dissect.esedb.page import Node, Page
     from dissect.esedb.table import Column, Table
 
 
 JET_cbKeyMost_OLD = 255
 
 
-class Index(object):
+class Index:
     """Represents an index on a table.
 
     This is still very much WIP but works for basic indexes.
@@ -266,7 +266,7 @@ def _encode_text(index: Index, column: Column, value: str, max_size: int) -> byt
     return bytes(key)
 
 
-def _encode_guid(value: Union[str, uuid.UUID]) -> bytes:
+def _encode_guid(value: str | uuid.UUID) -> bytes:
     if isinstance(value, str):
         value = uuid.UUID(value)
     guid_bytes = value.bytes_le
@@ -278,6 +278,5 @@ def _flip_bits(value: int, size: int) -> int:
     if value & (1 << (size - 1)):
         # If the high bit is set, all bits are flipped
         return ~value & ((1 << size) - 1)
-    else:
-        # Otherwise only the high bit is flipped
-        return value ^ (1 << (size - 1))
+    # Otherwise only the high bit is flipped
+    return value ^ (1 << (size - 1))
