@@ -7,9 +7,9 @@ from dissect.esedb.exceptions import (
 )
 
 __all__ = [
-    "EseDB",
-    "Error",
     "CompressedTaggedDataError",
+    "Error",
+    "EseDB",
     "InvalidDatabase",
     "KeyNotFoundError",
     "NoNeighbourPageError",

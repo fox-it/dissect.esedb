@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import datetime
+from typing import BinaryIO
 
 from dissect.util.ts import oatimestamp
 
@@ -6,7 +9,7 @@ from dissect.esedb.c_esedb import JET_coltyp
 from dissect.esedb.esedb import EseDB
 
 
-def test_basic_types(basic_db):
+def test_basic_types(basic_db: BinaryIO) -> None:
     db = EseDB(basic_db)
     table = db.table("basic")
 
@@ -54,7 +57,7 @@ def test_basic_types(basic_db):
     assert oatimestamp(records[1].DateTime) == datetime.datetime(1337, 6, 9, 0, 0, tzinfo=datetime.timezone.utc)
 
 
-def test_binary_types(binary_db):
+def test_binary_types(binary_db: BinaryIO) -> None:
     db = EseDB(binary_db)
     table = db.table("binary")
 
@@ -90,7 +93,7 @@ def test_binary_types(binary_db):
     assert records[0].MaxLongCompressedBinary == b"test max long compressed binary data " + (b"a" * 900)
 
 
-def test_text_types(text_db):
+def test_text_types(text_db: BinaryIO) -> None:
     db = EseDB(text_db)
     table = db.table("text")
 
@@ -158,7 +161,7 @@ def test_text_types(text_db):
     )
 
 
-def test_multivalue_types(multi_db):
+def test_multivalue_types(multi_db: BinaryIO) -> None:
     db = EseDB(multi_db)
     table = db.table("multi")
 
@@ -305,7 +308,7 @@ def test_multivalue_types(multi_db):
     assert records[1].UnsignedShort is None
 
 
-def test_default_db(default_db):
+def test_default_db(default_db: BinaryIO) -> None:
     db = EseDB(default_db)
     table = db.table("default")
 
@@ -334,7 +337,7 @@ def test_default_db(default_db):
     assert records[0].LongUnicode == "Long default Unicode 🦊 " + ("a" * 64)
 
 
-def test_large_db(large_db):
+def test_large_db(large_db: BinaryIO) -> None:
     db = EseDB(large_db)
     table = db.table("large")
 
@@ -342,6 +345,8 @@ def test_large_db(large_db):
     assert [(col.name, col.type) for col in table.columns] == [
         ("Id", JET_coltyp.Long),
     ] + [(f"Column{i}", JET_coltyp.UnsignedShort) for i in range(64993)]
+
+    assert len(list(db.pages())) == 766
 
     records = list(table.records())
     assert len(records) == 16

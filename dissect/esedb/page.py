@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import struct
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING
 
 from dissect.esedb.c_esedb import PAGE_FLAG, TAG_FLAG, c_esedb
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.esedb.esedb import EseDB
 
 
@@ -81,9 +83,11 @@ class Page:
         return not self.is_leaf
 
     @cached_property
-    def key_prefix(self) -> Optional[bytes]:
+    def key_prefix(self) -> bytes | None:
         if not self.is_root:
             return bytes(self.tag(0).data)
+
+        return None
 
     def tag(self, num: int) -> Tag:
         """Retrieve a tag by index.
@@ -104,7 +108,7 @@ class Page:
         for i in range(1, self.tag_count):
             yield self.tag(i)
 
-    def node(self, num: int) -> Union[BranchNode, LeafNode]:
+    def node(self, num: int) -> BranchNode | LeafNode:
         """Retrieve a node by index.
 
         Nodes are just tags, but indexed from the first tag.
@@ -123,7 +127,7 @@ class Page:
 
         return self._node_cache[num]
 
-    def nodes(self) -> Iterator[Union[BranchNode, LeafNode]]:
+    def nodes(self) -> Iterator[BranchNode | LeafNode]:
         """Yield all nodes."""
         for i in range(self.node_count):
             yield self.node(i)
@@ -152,8 +156,7 @@ class Page:
                     yield leaf
 
         if self.is_root and leaf and leaf.tag.page.next_page:
-            for leaf in esedb.page(leaf.tag.page.next_page).iter_leaf_nodes():
-                yield leaf
+            yield from esedb.page(leaf.tag.page.next_page).iter_leaf_nodes()
 
     def __repr__(self) -> str:
         return f"<Page num={self.num:d}>"
@@ -167,7 +170,7 @@ class Tag:
         num: The tag number to parse.
     """
 
-    __slots__ = ("page", "num", "tag", "offset", "size", "data", "flags")
+    __slots__ = ("data", "flags", "num", "offset", "page", "size", "tag")
 
     def __init__(self, page: Page, num: int):
         self.page = page
@@ -210,7 +213,7 @@ class Node:
         tag: The :class:`Tag` to parse a node from.
     """
 
-    __slots__ = ("tag", "num", "key", "key_prefix", "key_suffix", "data")
+    __slots__ = ("data", "key", "key_prefix", "key_suffix", "num", "tag")
 
     def __init__(self, tag: Tag):
         self.tag = tag

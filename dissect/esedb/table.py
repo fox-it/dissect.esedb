@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import TYPE_CHECKING, Any
 
 from dissect.esedb import compression
 from dissect.esedb.c_esedb import (
@@ -15,11 +15,13 @@ from dissect.esedb.c_esedb import (
 from dissect.esedb.cursor import Cursor
 from dissect.esedb.exceptions import NoNeighbourPageError
 from dissect.esedb.index import Index
-from dissect.esedb.page import Page
 from dissect.esedb.record import Record
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.esedb.esedb import EseDB
+    from dissect.esedb.page import Page
 
 
 class Table:
@@ -42,8 +44,8 @@ class Table:
         esedb: EseDB,
         name: str,
         root_page: int,
-        columns: list[Column] = None,
-        indexes: list[Index] = None,
+        columns: list[Column] | None = None,
+        indexes: list[Index] | None = None,
         record: Record = None,
     ):
         self.esedb = esedb
@@ -189,7 +191,7 @@ class Table:
 
 
 class Column:
-    def __init__(self, identifier: int, name: str, type_: JET_coltyp, record: Record = None):
+    def __init__(self, identifier: int, name: str, type_: JET_coltyp, record: Record | None = None):
         self.identifier = identifier
         self.name = name
         self.type = type_
@@ -227,17 +229,16 @@ class Column:
     def size(self) -> int:
         if self.record and self.record.get("SpaceUsage"):
             return self.record.get("SpaceUsage")
-        else:
-            return self.ctype.size
+        return self.ctype.size
 
     @cached_property
-    def default(self) -> Optional[Any]:
+    def default(self) -> Any | None:
         if self.record and self.record.get("DefaultValue"):
             return self.record.get("DefaultValue")
         return None
 
     @cached_property
-    def encoding(self) -> Optional[CODEPAGE]:
+    def encoding(self) -> CODEPAGE | None:
         if self.is_text:
             return CODEPAGE(self.record.get("PagesOrLocale")) if self.record else CODEPAGE.ASCII
         return None
@@ -260,7 +261,7 @@ class Catalog:
         root_page: The root page of the catalog table.
     """
 
-    CATALOG_COLUMNS = [
+    CATALOG_COLUMNS = (
         Column(1, "ObjidTable", JET_coltyp.Long),
         Column(2, "Type", JET_coltyp.Short),
         Column(3, "Id", JET_coltyp.Long),
@@ -289,7 +290,7 @@ class Catalog:
         Column(259, "SpaceHints", JET_coltyp.LongBinary),
         Column(260, "SpaceDeferredLVHints", JET_coltyp.LongBinary),
         Column(261, "LocaleName", JET_coltyp.LongBinary),
-    ]
+    )
 
     def __init__(self, esedb: EseDB, root_page: Page):
         self.esedb = esedb
