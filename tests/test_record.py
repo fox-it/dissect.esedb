@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import BinaryIO
 
 from dissect.esedb.esedb import EseDB
+from dissect.esedb.record import Record
 
 
 def test_as_dict(basic_db: BinaryIO) -> None:
@@ -40,3 +41,25 @@ def test_as_dict(basic_db: BinaryIO) -> None:
             "DateTime": -4537072128574357504,
         },
     ]
+
+
+def test_comparison(basic_db: BinaryIO) -> None:
+    db = EseDB(basic_db)
+    table = db.table("basic")
+
+    records = list(table.records())
+    assert len(records) == 2
+
+    assert records[0] == records[0]
+    assert records[0] != records[1]
+
+    obj = Record(table, records[0]._node)
+    assert records[0] == obj
+    assert records[0] is not obj
+
+    assert records[0] < records[1]
+    assert records[0] <= records[1]
+    assert records[0] <= records[0]
+
+    assert set(records) == {records[0], records[1]}
+    assert set(records) | {obj} == {records[0], records[1]}
