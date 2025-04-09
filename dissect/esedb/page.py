@@ -41,8 +41,11 @@ class Page:
         data_end = self.header.ibMicFree
         self.data = self.buf[data_start : data_start + data_end]
 
-        self.tag_count = self.header.itagMicFree
-        self.node_count = self.tag_count - 1
+        # On newer versions, itagMicFree was renamed to itagState and
+        # now includes a reserved tag count in the upper 4 bits
+        self.tag_reserved = (self.header.itagState >> 12) or 1
+        self.tag_count = self.header.itagState & 0x0FFF
+        self.node_count = self.tag_count - self.tag_reserved
         self._node_cls = LeafNode if self.is_leaf else BranchNode
         self._node_cache = {}
 

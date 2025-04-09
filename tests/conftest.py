@@ -26,44 +26,44 @@ def open_file_gz(name: str, mode: str = "rb") -> Iterator[BinaryIO]:
 
 @pytest.fixture
 def basic_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/basic.edb.gz")
+    yield from open_file_gz("_data/basic.edb.gz")
 
 
 @pytest.fixture
 def binary_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/binary.edb.gz")
+    yield from open_file_gz("_data/binary.edb.gz")
 
 
 @pytest.fixture
 def text_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/text.edb.gz")
+    yield from open_file_gz("_data/text.edb.gz")
 
 
 @pytest.fixture
 def multi_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/multi.edb.gz")
+    yield from open_file_gz("_data/multi.edb.gz")
 
 
 @pytest.fixture
 def default_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/default.edb.gz")
+    yield from open_file_gz("_data/default.edb.gz")
 
 
 @pytest.fixture
 def index_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/index.edb.gz")
+    yield from open_file_gz("_data/index.edb.gz")
 
 
 @pytest.fixture
 def large_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/large.edb.gz")
+    yield from open_file_gz("_data/large.edb.gz")
 
 
 @pytest.fixture
 def sru_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/SRUDB.dat.gz")
+    yield from open_file_gz("_data/SRUDB.dat.gz")
 
 
 @pytest.fixture
 def ual_db() -> Iterator[BinaryIO]:
-    yield from open_file_gz("data/Current.mdb.gz")
+    yield from open_file_gz("_data/Current.mdb.gz")

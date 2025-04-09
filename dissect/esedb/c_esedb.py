@@ -363,7 +363,7 @@ struct PGHDR {
     USHORT      cbFree;
     USHORT      cbUncommittedFree;
     USHORT      ibMicFree;
-    USHORT      itagMicFree;
+    USHORT      itagState;
     PAGE_FLAG   fFlags;
 };
 
