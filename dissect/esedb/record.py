@@ -256,7 +256,7 @@ class RecordData:
 
         return value
 
-    def _parse_multivalue(self, value: bytes, tag_field: TagField) -> bytes:
+    def _parse_multivalue(self, value: bytes, tag_field: TagField) -> list[bytes]:
         fSeparatedInstance = 0x8000
 
         if tag_field.flags & TAGFLD_HEADER.TwoValues:
@@ -281,6 +281,8 @@ class RecordData:
                     data = self.table.get_long_value(bytes(data))
                 values.append(data)
             value = values
+        else:
+            raise ValueError(f"Unknown flags for tag field: {tag_field}")
 
         if tag_field.flags & TAGFLD_HEADER.Compressed:
             # Only the first entry appears to be compressed
