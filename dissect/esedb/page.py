@@ -206,7 +206,7 @@ class Tag:
         self.flags = TAG_FLAG(flags)
 
     def __repr__(self) -> str:
-        return f"<Tag offset=0x{self.offset:x} size=0x{self.size:x}>"
+        return f"<Tag offset={self.offset:#x} size={self.size:#x}>"
 
 
 class Node:
