@@ -63,3 +63,13 @@ def test_comparison(basic_db: BinaryIO) -> None:
 
     assert set(records) == {records[0], records[1]}
     assert set(records) | {obj} == {records[0], records[1]}
+
+
+def test_parse_value(windows_search_db: BinaryIO) -> None:
+    """Test if we can parse utf-16-le (Long)Text columns."""
+
+    db = EseDB(windows_search_db)
+    table = db.table("SystemIndex_PropertyStore")
+
+    record = table.search(WorkID=1017)
+    assert record.get("4625-System_Search_AutoSummary")
