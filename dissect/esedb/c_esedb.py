@@ -493,7 +493,7 @@ def decode_bit(buf: bytes) -> bool:
     return c_esedb.uint8(buf) == 0xFF
 
 
-def decode_text(buf: bytes, encoding: CODEPAGE) -> str:
+def decode_text(buf: bytes, encoding: CODEPAGE, errors: str | None = "backslashreplace") -> str:
     """Decode text with the appropriate encoding.
 
     Args:
@@ -504,7 +504,7 @@ def decode_text(buf: bytes, encoding: CODEPAGE) -> str:
     if encoding == CODEPAGE.UNICODE and len(buf) % 2:
         buf += b"\x00"
 
-    return buf.decode(CODEPAGE_MAP[encoding]).rstrip("\x00")
+    return buf.decode(CODEPAGE_MAP[encoding], errors=errors).rstrip("\x00")
 
 
 def decode_guid(buf: bytes) -> str:
