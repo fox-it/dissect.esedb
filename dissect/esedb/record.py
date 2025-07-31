@@ -195,7 +195,7 @@ class RecordData:
         self._get_tag_field = lru_cache(4096)(self._get_tag_field)
         self._find_tag_field_idx = lru_cache(4096)(self._find_tag_field_idx)
 
-    def get(self, column: Column, raw: bool = False) -> RecordValue:
+    def get(self, column: Column, raw: bool = False, errors: str | None = "backslashreplace") -> RecordValue:
         """Retrieve the value for the specified column.
 
         Optionally receive the raw data as it's stored in the record.
@@ -206,6 +206,7 @@ class RecordData:
         Args:
             column: The column to retrieve the value of.
             raw: Whether to return the raw data stored in the record instead of the parsed value.
+            errors: Error handling scheme to use when decoding bytes to text (default: 'backslashreplace').
         """
         value = None
         tag_field = None
@@ -228,11 +229,11 @@ class RecordData:
             return value
 
         if value is not None:
-            return self._parse_value(column, value, tag_field)
+            return self._parse_value(column, value, tag_field, errors)
 
         return None
 
-    def as_dict(self, raw: bool = False) -> dict[str, RecordValue]:
+    def as_dict(self, raw: bool = False, errors: str | None = "backslashreplace") -> dict[str, RecordValue]:
         """Serialize the record as a dictionary."""
         obj = {}
 
@@ -251,13 +252,15 @@ class RecordData:
             column = self.table._column_id_map[column_id]
 
             try:
-                obj[column.name] = self.get(column, raw)
+                obj[column.name] = self.get(column, raw, errors)
             except Exception as e:
                 obj[column.name] = f"!ERROR! {e}"
 
         return obj
 
-    def _parse_value(self, column: Column, value: bytes, tag_field: TagField = None) -> RecordValue:
+    def _parse_value(
+        self, column: Column, value: bytes, tag_field: TagField = None, errors: str | None = "backslashreplace"
+    ) -> RecordValue:
         """Parse the raw value into the appropriate type.
 
         For tagged columns, also interpret things like multi-values, separated and compressed data.
@@ -265,7 +268,7 @@ class RecordData:
         ctype = column.ctype
         parse_func = ctype.parse
         if column.is_text:
-            parse_func = functools.partial(ctype.parse, encoding=column.encoding)
+            parse_func = functools.partial(ctype.parse, encoding=column.encoding, errors=errors)
 
         if self.esedb.impacket_compat:
             if tag_field and tag_field.flags & TAGFLD_HEADER.Compressed:
