@@ -63,3 +63,19 @@ def test_comparison(basic_db: BinaryIO) -> None:
 
     assert set(records) == {records[0], records[1]}
     assert set(records) | {obj} == {records[0], records[1]}
+
+
+def test_parse_value_encoding(windows_search_db: BinaryIO) -> None:
+    """Test if we can parse invalid utf-16-le (Long)Text columns.
+
+    Resources:
+        - https://github.com/fox-it/dissect.esedb/pull/48
+    """
+
+    db = EseDB(windows_search_db)
+    table = db.table("SystemIndex_PropertyStore")
+
+    record = table.search(WorkID=1017)
+    auto_summary = record.get("4625-System_Search_AutoSummary")
+    assert auto_summary.startswith("Hong Kong SCS AdobeMingStd-Light-Acro-HKscs-B5-H ASCII")
+    assert auto_summary.endswith("\\x4c\\xd8")

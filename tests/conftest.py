@@ -67,3 +67,8 @@ def sru_db() -> Iterator[BinaryIO]:
 @pytest.fixture
 def ual_db() -> Iterator[BinaryIO]:
     yield from open_file_gz("_data/Current.mdb.gz")
+
+
+@pytest.fixture
+def windows_search_db() -> Iterator[BinaryIO]:
+    yield from open_file_gz("_data/Windows.edb.gz")
