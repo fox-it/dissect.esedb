@@ -129,7 +129,7 @@ def map_string(value: str, flags: MapFlags, locale: str) -> bytes:
             if flags & MapFlags.LINGUISTIC_IGNOREDIACRITIC:
                 diacritic_weight = 2
 
-            if len(key_diacritic):
+            if key_diacritic:
                 key_diacritic[-1] += diacritic_weight
             else:
                 key_diacritic.append(diacritic_weight)

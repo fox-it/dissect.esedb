@@ -214,7 +214,7 @@ class Table:
 
         buf = []
         chunk_offset = 0
-        for chunk, next_chunk_offset in zip(chunks, chunk_offsets[1:]):
+        for chunk, next_chunk_offset in zip(chunks, chunk_offsets[1:], strict=False):
             # Chunk sizes should be used to determine if a chunk is compressed
             if len(chunk) != next_chunk_offset - chunk_offset:
                 chunk = compression.decompress(chunk)

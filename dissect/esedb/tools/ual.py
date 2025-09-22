@@ -3,7 +3,7 @@ import datetime
 import ipaddress
 from collections.abc import Iterator
 from pathlib import Path
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 from dissect.util.ts import wintimestamp
 
@@ -11,7 +11,7 @@ from dissect.esedb.c_esedb import RecordValue
 from dissect.esedb.esedb import EseDB
 from dissect.esedb.table import Table
 
-UalValue = Union[RecordValue, ipaddress.IPv4Address, ipaddress.IPv6Interface, tuple[datetime.datetime]]
+UalValue = RecordValue | ipaddress.IPv4Address | ipaddress.IPv6Interface | tuple[datetime.datetime]
 
 SKIP_TABLES = [
     "MSysObjects",
