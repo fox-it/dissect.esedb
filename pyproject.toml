@@ -41,6 +41,26 @@ dev = [
     "dissect.util>=3.5.dev,<4.0.dev",
 ]
 
+[dependency-groups]
+test = [
+    "pytest",
+]
+lint = [
+    "ruff==0.13.1",
+    "vermin",
+]
+build = [
+    "build",
+]
+debug = [
+    "ipdb",
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "debug"},
+]
+
 [tool.ruff]
 line-length = 120
 required-version = ">=0.9.0"
