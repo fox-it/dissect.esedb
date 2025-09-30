@@ -4,6 +4,10 @@ A Dissect module implementing a parser for Microsofts Extensible Storage Engine 
 Active Directory, Exchange and Windows Update. For more information, please see [the
 documentation](https://docs.dissect.tools/en/latest/projects/dissect.esedb/index.html).
 
+## Supersession notice
+
+This project has been **superseded** by [`dissect.database`](https://github.com/fox-it/dissect.database), which provides the same functionality along with broader database support.
+
 ## Requirements
 
 This project is part of the Dissect framework and requires Python.
@@ -25,7 +29,7 @@ This module is also automatically installed if you install the `dissect` package
 ### Impacket compatibility shim for secretsdump.py
 
 Impacket does not ([yet](https://github.com/fortra/impacket/pull/1452)) have native support for `dissect.esedb`,
-so in the meantime a compatibility shim is provided. To use this shim, simply install `dissect.esedb` using the 
+so in the meantime a compatibility shim is provided. To use this shim, simply install `dissect.esedb` using the
 instructions above, and execute `secretsdump.py` like so:
 
 ```bash
